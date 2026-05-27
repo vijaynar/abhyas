@@ -1,0 +1,253 @@
+-- ============================================================
+-- MIGRATION: 0001_initial_schema.sql
+-- Upasthiti — Core Database Schema
+-- ============================================================
+-- Run: supabase db reset  (applies all migrations fresh)
+-- ============================================================
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "vector";        -- pgvector for face embeddings
+
+-- ============================================================
+-- TABLE 1: tenants
+-- One row per institute / coaching center / academy
+-- ============================================================
+CREATE TABLE tenants (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                VARCHAR(255) NOT NULL,
+    slug                VARCHAR(100) UNIQUE NOT NULL,          -- URL-safe identifier e.g. "elite-academy"
+    domain              VARCHAR(100) UNIQUE,                   -- custom domain if any
+    subscription_status VARCHAR(50)  NOT NULL DEFAULT 'trial'
+                            CHECK (subscription_status IN ('trial', 'active', 'suspended', 'cancelled')),
+    logo_url            TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE 2: users
+-- Linked 1-to-1 with Supabase auth.users via shared UUID
+-- ============================================================
+CREATE TABLE users (
+    id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    tenant_id       UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    role            VARCHAR(50)  NOT NULL
+                        CHECK (role IN ('superadmin', 'admin', 'student', 'parent')),
+    first_name      VARCHAR(100) NOT NULL,
+    last_name       VARCHAR(100) NOT NULL,
+    phone           VARCHAR(20),
+    avatar_url      TEXT,
+    is_active       BOOLEAN      NOT NULL DEFAULT true,
+    -- Notification tokens (populated when mobile app registers)
+    expo_push_token VARCHAR(255),                              -- [LATER] mobile push
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE 3: classes
+-- A subject / discipline offered by the tenant
+-- e.g. "Advanced Swimming", "Intermediate Karate"
+-- ============================================================
+CREATE TABLE classes (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id   UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name        VARCHAR(100) NOT NULL,
+    description TEXT,
+    is_active   BOOLEAN      NOT NULL DEFAULT true,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, name)
+);
+
+-- ============================================================
+-- TABLE 4: batches
+-- A scheduled time-slot for a class
+-- days_of_week: 1=Monday … 7=Sunday (ISO weekday)
+-- ============================================================
+CREATE TABLE batches (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id    UUID         NOT NULL REFERENCES tenants(id)  ON DELETE CASCADE,
+    class_id     UUID         NOT NULL REFERENCES classes(id)  ON DELETE CASCADE,
+    name         VARCHAR(100) NOT NULL,                        -- e.g. "Morning Batch"
+    start_time   TIME         NOT NULL,
+    end_time     TIME         NOT NULL,
+    days_of_week SMALLINT[]   NOT NULL,                        -- [1,3,5] = Mon/Wed/Fri
+    max_capacity INTEGER      NOT NULL DEFAULT 50,
+    is_active    BOOLEAN      NOT NULL DEFAULT true,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT valid_time_range CHECK (end_time > start_time)
+);
+
+-- ============================================================
+-- TABLE 5: students
+-- Extended profile for users with role = 'student'
+-- ============================================================
+CREATE TABLE students (
+    id                UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id         UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    batch_id          UUID         REFERENCES batches(id) ON DELETE SET NULL,
+    student_custom_id VARCHAR(50)  NOT NULL,                   -- Institute roll number
+    date_of_birth     DATE         NOT NULL,
+    joining_date      DATE         NOT NULL DEFAULT CURRENT_DATE,
+    address           TEXT,
+    emergency_contact VARCHAR(20),
+    status            VARCHAR(50)  NOT NULL DEFAULT 'active'
+                          CHECK (status IN ('active', 'inactive', 'suspended')),
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, student_custom_id)
+);
+
+-- ============================================================
+-- TABLE 6: parents
+-- Extended profile for users with role = 'parent'
+-- ============================================================
+CREATE TABLE parents (
+    id         UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id  UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE 7: parent_student_map
+-- Many-to-many: one parent may have multiple children;
+-- one student may have mother + father both linked
+-- ============================================================
+CREATE TABLE parent_student_map (
+    parent_id    UUID        NOT NULL REFERENCES parents(id)  ON DELETE CASCADE,
+    student_id   UUID        NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    relationship VARCHAR(50) NOT NULL DEFAULT 'parent'
+                     CHECK (relationship IN ('father', 'mother', 'guardian', 'parent')),
+    PRIMARY KEY (parent_id, student_id)
+);
+
+-- ============================================================
+-- TABLE 8: student_face_samples
+-- Stores one row per enrolled face photo for a student.
+-- embedding: 128-dimensional float vector computed client-side
+-- Multiple samples per student improves match accuracy.
+-- ============================================================
+CREATE TABLE student_face_samples (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id  UUID        NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    tenant_id   UUID        NOT NULL REFERENCES tenants(id)  ON DELETE CASCADE,
+    photo_url   TEXT        NOT NULL,                         -- Supabase Storage URL (private bucket)
+    embedding   vector(128) NOT NULL,                         -- face-api.js / TF.js computed descriptor
+    label       VARCHAR(100),                                 -- optional: "front", "left_profile", etc.
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE 9: attendance_logs
+-- One row per student per batch per date.
+-- UNIQUE constraint prevents double check-ins.
+-- ============================================================
+CREATE TABLE attendance_logs (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id         UUID        NOT NULL REFERENCES tenants(id)   ON DELETE CASCADE,
+    student_id        UUID        NOT NULL REFERENCES students(id)   ON DELETE CASCADE,
+    batch_id          UUID        NOT NULL REFERENCES batches(id)    ON DELETE CASCADE,
+    date              DATE        NOT NULL DEFAULT CURRENT_DATE,
+    check_in          TIMESTAMPTZ,                                   -- NULL if absent
+    status            VARCHAR(50) NOT NULL
+                          CHECK (status IN ('present', 'late', 'absent')),
+    verification_mode VARCHAR(50) NOT NULL
+                          CHECK (verification_mode IN ('face_live', 'face_photo', 'manual')),
+    confidence_score  NUMERIC(5,2),                                  -- face match % (NULL for manual)
+    verified_by       UUID        REFERENCES users(id),              -- admin UUID if manual override
+    notes             TEXT,                                          -- optional admin note
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (student_id, batch_id, date)
+);
+
+-- ============================================================
+-- TABLE 10: tenant_settings
+-- One row per tenant. Configures fine rules and schedules.
+-- ============================================================
+CREATE TABLE tenant_settings (
+    tenant_id               UUID        PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+    -- Fine structure
+    absent_fine_rule_1      NUMERIC(10,2) NOT NULL DEFAULT 1000.00,   -- fine per day, up to 4 absences/month
+    absent_fine_rule_1_days INTEGER       NOT NULL DEFAULT 4,          -- threshold day count
+    absent_fine_rule_2      NUMERIC(10,2) NOT NULL DEFAULT 2000.00,   -- fine per day, 5+ absences/month
+    -- Timing rules
+    late_threshold_minutes  INTEGER       NOT NULL DEFAULT 5,          -- minutes after start = "late"
+    grace_period_minutes    INTEGER       NOT NULL DEFAULT 0,          -- extra window before marking absent
+    -- Calendar
+    currency                VARCHAR(10)   NOT NULL DEFAULT 'INR',
+    holidays                DATE[]        NOT NULL DEFAULT '{}',
+    weekends                SMALLINT[]    NOT NULL DEFAULT '{6,7}',    -- 6=Sat, 7=Sun
+    -- Auto-fine controls
+    auto_fine_enabled       BOOLEAN       NOT NULL DEFAULT true,
+    updated_at              TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE 11: fines
+-- Auto-generated or manually created fine records.
+-- Deferred: fine_payments table (payment proof uploads) is LATER
+-- ============================================================
+CREATE TABLE fines (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id    UUID          NOT NULL REFERENCES tenants(id)        ON DELETE CASCADE,
+    student_id   UUID          NOT NULL REFERENCES students(id)       ON DELETE CASCADE,
+    attendance_log_id UUID     REFERENCES attendance_logs(id)         ON DELETE SET NULL,
+    amount       NUMERIC(10,2) NOT NULL,
+    reason       TEXT          NOT NULL,
+    status       VARCHAR(50)   NOT NULL DEFAULT 'unpaid'
+                     CHECK (status IN ('unpaid', 'paid', 'waived')), -- 'pending_verification' added LATER
+    issued_date  DATE          NOT NULL DEFAULT CURRENT_DATE,
+    paid_date    TIMESTAMPTZ,
+    waived_by    UUID          REFERENCES users(id),
+    waive_reason TEXT,
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- UPDATED_AT triggers — auto-update timestamp on row change
+-- ============================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_tenants_updated_at
+    BEFORE UPDATE ON tenants
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_classes_updated_at
+    BEFORE UPDATE ON classes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_batches_updated_at
+    BEFORE UPDATE ON batches
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_students_updated_at
+    BEFORE UPDATE ON students
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_attendance_updated_at
+    BEFORE UPDATE ON attendance_logs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_settings_updated_at
+    BEFORE UPDATE ON tenant_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_fines_updated_at
+    BEFORE UPDATE ON fines
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

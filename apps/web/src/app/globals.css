@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/* ── Deep Slate & Indigo Glow Color System ── */
+:root {
+  --background: #060814; /* Deep Slate Space */
+  --foreground: #f1f5f9; /* Slate 100 */
+  
+  --panel-bg: rgba(15, 23, 42, 0.45); /* Semi-transparent Slate 900 */
+  --panel-border: rgba(99, 102, 241, 0.15); /* Light Indigo Translucent */
+  
+  --primary: #6366f1; /* Indigo 500 */
+  --primary-glow: rgba(99, 102, 241, 0.5);
+  --primary-hover: #4f46e5; /* Indigo 600 */
+  
+  --accent: #a855f7; /* Purple 500 */
+  --accent-glow: rgba(168, 85, 247, 0.4);
+  
+  --success: #10b981; /* Emerald 500 */
+  --success-glow: rgba(16, 185, 129, 0.25);
+  
+  --warning: #f59e0b; /* Amber 500 */
+  --warning-glow: rgba(245, 158, 11, 0.25);
+  
+  --danger: #ef4444; /* Red 500 */
+  --danger-glow: rgba(239, 68, 68, 0.25);
+
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Force dark mode canvas styles */
+html, body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Smooth Scrolling & Selections ── */
+* {
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background-color: var(--primary-glow);
+  color: #ffffff;
+}
+
+/* ── Premium Background Blobs & mesh ── */
+.radial-mesh-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -10;
+  background-color: var(--background);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(6, 8, 20, 0.5) 0%, var(--background) 100%);
+  overflow: hidden;
+}
+
+.radial-mesh-bg::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 60%);
+  animation: slow-rotate 35s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Glassmorphism Styling Utility Tokens ── */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(99, 102, 241, 0.12);
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--foreground);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.3);
+}
+
+/* ── Glow Borders & Indicators ── */
+.glow-border {
+  border: 1px solid var(--panel-border);
+  position: relative;
+}
+
+.glow-border::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--primary), var(--accent)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.glow-border:hover::after {
+  opacity: 0.7;
+}
+
+.glow-indigo {
+  box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 15px var(--success-glow);
+}
+
+.glow-text-indigo {
+  text-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+}
+
+/* ── Custom Interactive Animations ── */
+.btn-premium {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 14px var(--primary-glow);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.75);
+}
+
+.btn-premium:active {
+  transform: translateY(1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Keyframe Animations ── */
+@keyframes slow-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.pulsing-glow {
+  animation: pulse-glow 8s ease-in-out infinite;
+}
+
+/* Hide scrollbars but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(6, 8, 20, 0.3);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
