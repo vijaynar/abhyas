@@ -695,7 +695,7 @@ export default function AdminReportsPage() {
                       <div className="absolute top-0 right-0 w-16 h-16 rounded-full bg-indigo-500/5 blur-xl group-hover:bg-indigo-500/10 transition-colors" />
                       <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Total Students</span>
                       <div className="flex items-baseline gap-1.5 mt-2">
-                        <span className="text-2xl font-black text-white">{totalStudentsCount}</span>
+                        <span className="text-2xl font-black text-slate-100">{totalStudentsCount}</span>
                         <span className="text-[10px] text-slate-500 font-semibold">profiles</span>
                       </div>
                     </button>

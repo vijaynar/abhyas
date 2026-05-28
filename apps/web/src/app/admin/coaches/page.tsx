@@ -826,19 +826,19 @@ export default function CoachesPage() {
               <thead>
                 <tr className="border-b border-white/5">
                   {[
-                    { name: 'Coach', minWidth: '180px' },
-                    { name: 'Phone', minWidth: '110px' },
-                    { name: 'Expertise', minWidth: '130px' },
-                    { name: 'Availability', minWidth: '160px' },
-                    { name: 'Rate (₹/hr)', minWidth: '100px' },
-                    { name: 'Batches', minWidth: '160px' },
-                    { name: 'Status', minWidth: '90px' },
-                    { name: 'Actions', minWidth: '140px' },
+                    { name: 'Coach', minWidth: '150px' },
+                    { name: 'Phone', minWidth: '100px' },
+                    { name: 'Expertise', minWidth: '100px' },
+                    { name: 'Availability', minWidth: '120px' },
+                    { name: 'Rate (₹/hr)', minWidth: '85px' },
+                    { name: 'Batches', minWidth: '85px' },
+                    { name: 'Status', minWidth: '80px' },
+                    { name: 'Actions', minWidth: '110px' },
                   ].map((h) => (
                     <th
                       key={h.name}
                       style={{ minWidth: h.minWidth }}
-                      className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3 whitespace-nowrap"
+                      className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-3 whitespace-nowrap"
                     >
                       {h.name}
                     </th>
@@ -862,7 +862,7 @@ export default function CoachesPage() {
                         onClick={() => setExpandedRow(isExpanded ? null : coach.id)}
                       >
                         {/* Avatar + Name + Email */}
-                        <td className="px-5 py-4">
+                        <td className="px-3 py-3">
                           <div className="flex items-center gap-3">
                             <AvatarCircle
                               url={coach.avatar_url}
@@ -873,7 +873,7 @@ export default function CoachesPage() {
                               <p className="font-semibold text-slate-100 whitespace-nowrap">
                                 {coach.first_name} {coach.last_name}
                               </p>
-                              <p className="text-slate-400 text-xs truncate max-w-[160px]">
+                              <p className="text-slate-400 text-xs truncate max-w-[140px]">
                                 {coach.email}
                               </p>
                             </div>
@@ -881,14 +881,14 @@ export default function CoachesPage() {
                         </td>
 
                         {/* Phone */}
-                        <td className="px-5 py-4 text-slate-300 whitespace-nowrap">
+                        <td className="px-3 py-3 text-slate-300 whitespace-nowrap text-xs">
                           {coach.phone ?? <span className="text-slate-600">—</span>}
                         </td>
 
                         {/* Expertise */}
-                        <td className="px-5 py-4">
+                        <td className="px-3 py-3">
                           {coach.coach_profile?.expertise ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 max-w-[140px] truncate">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 max-w-[120px] truncate">
                               <Award className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{coach.coach_profile.expertise}</span>
                             </span>
@@ -898,9 +898,9 @@ export default function CoachesPage() {
                         </td>
 
                         {/* Availability */}
-                        <td className="px-5 py-4">
+                        <td className="px-3 py-3">
                           {coach.coach_profile?.availability_slots ? (
-                            <p className="text-slate-300 text-xs max-w-[160px] line-clamp-2">
+                            <p className="text-slate-300 text-xs max-w-[140px] line-clamp-2">
                               {coach.coach_profile.availability_slots}
                             </p>
                           ) : (
@@ -909,27 +909,27 @@ export default function CoachesPage() {
                         </td>
 
                         {/* Hourly Rate */}
-                        <td className="px-5 py-4">
+                        <td className="px-3 py-3 text-xs">
                           <span className="text-emerald-400 font-semibold">
                             ₹{(coach.coach_profile?.hourly_rate ?? 0).toLocaleString('en-IN')}
                           </span>
                         </td>
 
                         {/* Active Batches */}
-                        <td className="px-5 py-4">
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                             {activeBatches.length}
                           </span>
                         </td>
 
                         {/* Status */}
-                        <td className="px-5 py-4">
+                        <td className="px-3 py-3">
                           <StatusBadge active={coach.is_active} />
                         </td>
 
                         {/* Actions */}
                         <td
-                          className="px-5 py-4"
+                          className="px-3 py-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center gap-2">

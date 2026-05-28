@@ -294,7 +294,7 @@ export default function AttendanceLogsPage() {
             <Sparkles className="w-4 h-4" /> Academic Gatekeeping
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Daily Attendance Ledger
+            Daily Attendance Sheet
           </h1>
         </div>
         <div className="flex items-center gap-3 self-start md:self-auto">
@@ -310,7 +310,7 @@ export default function AttendanceLogsPage() {
             className="btn-secondary h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer self-start md:self-auto"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh Ledger
+            Refresh Sheet
           </button>
         </div>
       </div>
@@ -385,7 +385,7 @@ export default function AttendanceLogsPage() {
                 <tr>
                   <td colSpan={7} className="py-12 text-center">
                     <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo mx-auto mb-3" />
-                    <p className="text-xs text-slate-400">Loading daily ledger logsheets...</p>
+                    <p className="text-xs text-slate-400">Loading daily attendance sheet...</p>
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
