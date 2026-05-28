@@ -570,3 +570,165 @@ html, body {
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* ════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS
+   ════════════════════════════════════════════════════════════ */
+
+/* Prevent mobile browsers from auto-enlarging text and inputs */
+html, body, input, select, textarea {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+}
+
+/* Safe area inset for notched devices (iPhone X+) */
+.safe-top    { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+body { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ── TABLE HORIZONTAL SCROLLING ──────────────────────────────
+   Core fix: .glass-panel.overflow-hidden blocks child
+   overflow-x:auto from creating a scrollbar on mobile.
+   Override to allow-x-scroll on mobile while keeping y-clip.
+   ─────────────────────────────────────────────────────────── */
+
+/* All overflow-x-auto wrappers: smooth touch scroll */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+  /* Prevent mobile viewport expansion from overflowing tables */
+  main,
+  main > div,
+  .glass-panel,
+  .overflow-x-auto {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* The critical fix: glass panels that contain scrollable tables
+     must keep overflow-x: hidden to clip the rounded corners and maintain
+     the card layout on mobile, while the inner overflow-x-auto container
+     scrolls the table. */
+  .glass-panel.overflow-hidden,
+  .glass-panel.rounded-2xl.overflow-hidden,
+  .glass-panel.rounded-3xl.overflow-hidden {
+    overflow-x: hidden !important;
+  }
+
+  /* All inner scroll wrappers: force scrollability */
+  .overflow-x-auto {
+    overflow-x: auto !important;
+    overflow-y: visible;
+    min-width: 0 !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure a subtle scrollbar is visible on mobile for horizontal scrolls */
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 4px !important;
+    display: block !important;
+  }
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb) !important;
+    border-radius: 2px !important;
+  }
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: var(--track-bg) !important;
+  }
+
+  /* Show subtle scrollbar on mobile even if no-scrollbar class is used */
+  .no-scrollbar::-webkit-scrollbar {
+    display: block !important;
+    height: 4px !important;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: auto !important;
+    scrollbar-width: thin !important;
+  }
+
+  /* Tables inside scroll containers: prevent collapsing and force horizontal scroll */
+  .overflow-x-auto > table,
+  .overflow-x-auto table {
+    min-width: 760px !important;
+    width: max-content !important;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+
+  /* Tables with many columns (attendance, reports, students) need more room */
+  .overflow-x-auto > table.w-full {
+    min-width: 860px !important;
+  }
+
+  /* ── REDUCE PANEL PADDING ── */
+  .glass-panel.p-6  { padding: 1rem !important; }
+  .glass-panel.p-8  { padding: 1.25rem !important; }
+
+  /* ── MODALS: full-width, scrollable ── */
+  [class*="max-w-sm"].glass-panel,
+  [class*="max-w-md"].glass-panel,
+  [class*="max-w-lg"].glass-panel,
+  [class*="max-w-xl"].glass-panel,
+  [class*="max-w-2xl"].glass-panel,
+  [class*="max-w-3xl"].glass-panel {
+    max-width: calc(100vw - 1.5rem) !important;
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+
+  /* Fixed-position modals: cap height and scroll */
+  .fixed.inset-0 > .glass-panel,
+  .fixed.inset-0 > [class*="glass-panel"] {
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+  }
+
+  /* ── STAT / METRIC CARD GRIDS ── */
+  /* 4-col grids → 2-col on mobile */
+  [class*="grid-cols-4"]:not(table) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* 3-col grids → 2-col on mobile */
+  [class*="grid-cols-3"]:not(table) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  /* ── HEADER ACTION ROW: stack vertically ── */
+  .flex.items-center.justify-between.gap-4 {
+    flex-wrap: wrap;
+  }
+
+  /* ── REDUCE BORDER RADIUS (cosmetic) ── */
+  .rounded-3xl { border-radius: 1.25rem !important; }
+  .rounded-2xl { border-radius: 1rem !important; }
+}
+
+/* ── TOUCH TARGETS ─────────────────────────────────────────── */
+/* Minimum 44×44 tap targets per Apple/Google guidelines */
+button, a, [role="button"] {
+  min-height: 36px; /* Allow smaller in dense UI, 44 for standalone */
+  touch-action: manipulation; /* No double-tap zoom */
+}
+
+/* ── INPUT AUTO-ZOOM & SIZING BALANCE ──────────────────────── */
+/* Balanced input sizing to match our premium dense UI typography on mobile */
+select option {
+  background-color: #0b0d19;
+  color: #f1f5f9;
+}
+
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 12px !important; /* Perfectly matches text-xs */
+  }
+  select option {
+    font-size: 11px !important; /* Elegant, compact text scale prevents wrapping */
+    padding: 6px 8px !important;
+  }
+}
+
+/* ── MOBILE HEADER COMPENSATION ─────────────────────────────── */
+@media (max-width: 768px) {
+  .pt-16 { padding-top: 4rem; }
+}
+
+

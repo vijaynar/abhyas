@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBrowserClient } from '@/lib/supabase';
@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Prevents Android Chrome from double-toggling password visibility
+  // (Chrome fires both touchend AND mousedown for a single tap)
+  const pwTouchHandled = useRef(false);
   const router = useRouter();
   const supabase = createBrowserClient();
 
@@ -27,54 +30,93 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    try {
-      // 1. Resolve identifier (email or roll number) to correct Supabase Auth email
-      const resolveRes = await fetch('/api/v1/auth/resolve-identifier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: email }),
-      });
+    const identifier = email.trim();
+    if (!identifier || !password) {
+      setError('Please enter your email/roll number and password.');
+      setLoading(false);
+      return;
+    }
 
-      const resolveData = await resolveRes.json();
-      if (!resolveRes.ok) {
-        throw new Error(resolveData.error || 'Failed to resolve login account details.');
+    try {
+      // ── Step 1: Resolve the identifier to a Supabase Auth email ──
+      console.log('[Login] Resolving identifier:', identifier);
+      let resolveRes: Response;
+      try {
+        resolveRes = await fetch('/api/v1/auth/resolve-identifier', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier }),
+        });
+      } catch (networkErr: any) {
+        console.error('[Login] Network error on resolve-identifier:', networkErr);
+        throw new Error('Network error — could not reach the server. Check your connection and try again.');
       }
 
-      const loginEmail = resolveData.data.email;
+      let resolveData: any;
+      try {
+        resolveData = await resolveRes.json();
+      } catch (parseErr) {
+        console.error('[Login] Failed to parse resolve-identifier response');
+        throw new Error('Server returned an unexpected response. Please try again.');
+      }
 
-      // 2. Sign in with the resolved email
+      console.log('[Login] Resolve response status:', resolveRes.status, 'data:', resolveData);
+
+      if (!resolveRes.ok) {
+        throw new Error(resolveData?.error || `Account lookup failed (${resolveRes.status}).`);
+      }
+
+      const loginEmail = resolveData?.data?.email;
+      if (!loginEmail) {
+        throw new Error('Server did not return a login email. Please try again.');
+      }
+
+      // ── Step 2: Sign in with Supabase Auth ──
+      console.log('[Login] Signing in with email:', loginEmail);
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password,
       });
 
       if (authError) {
+        console.error('[Login] Supabase auth error:', authError.message);
+        // Give a friendlier message for the most common error
+        if (authError.message.toLowerCase().includes('invalid login')) {
+          throw new Error('Incorrect password. Please try again.');
+        }
         throw new Error(authError.message);
       }
 
-      if (data?.user) {
-        // Query user role in public.users to determine dashboard redirect
-        const { data: profile, error: dbError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (dbError || !profile) {
-          throw new Error('Failed to retrieve user profile.');
-        }
-
-        // Redirect based on role
-        if (profile.role === 'student' || profile.role === 'parent') {
-          router.push('/student/dashboard');
-        } else {
-          // admin, superadmin, coach all go to admin dashboard
-          router.push('/admin/dashboard');
-        }
-        router.refresh();
+      if (!data?.user) {
+        throw new Error('Login succeeded but no user was returned. Please try again.');
       }
+
+      // ── Step 3: Fetch user role and redirect ──
+      console.log('[Login] Fetching user profile for:', data.user.id);
+      const { data: profile, error: dbError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (dbError || !profile) {
+        console.error('[Login] Profile fetch error:', dbError?.message);
+        throw new Error('Logged in, but could not fetch your profile. Please refresh.');
+      }
+
+      console.log('[Login] User role:', profile.role, '— redirecting…');
+
+      if (profile.role === 'student' || profile.role === 'parent') {
+        router.push('/student/dashboard');
+      } else {
+        router.push('/admin/dashboard');
+      }
+      router.refresh();
+      // Don't clear loading here — page is navigating away
+
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      console.error('[Login] Login error:', err.message);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
   };
@@ -154,6 +196,11 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@academy.com, vs00001, or 9876543210"
                 className="w-full h-11 pl-10 pr-4 rounded-xl glass-input text-sm"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
               />
             </div>
           </div>
@@ -167,7 +214,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={openForgotModal}
-                className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors cursor-pointer"
+                className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors cursor-pointer py-3 px-2 -mr-2 touch-manipulation"
               >
                 Forgot password?
               </button>
@@ -182,12 +229,28 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full h-11 pl-10 pr-10 rounded-xl glass-input text-sm"
+                className="w-full h-11 pl-10 pr-12 rounded-xl glass-input text-sm"
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
               />
+              {/* Show/hide password — 44px tap zone, deduped for Android Chrome */}
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-300 transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onTouchEnd={(e) => {
+                  e.preventDefault(); // stop Chrome firing mousedown afterwards
+                  pwTouchHandled.current = true;
+                  setShowPassword((v) => !v);
+                  // reset after synthetic mouse events have passed (~500ms)
+                  setTimeout(() => { pwTouchHandled.current = false; }, 500);
+                }}
+                onMouseDown={(e) => {
+                  if (pwTouchHandled.current) return; // already handled by touch
+                  e.preventDefault(); // prevent input blur on desktop
+                  setShowPassword((v) => !v);
+                }}
+                className="absolute inset-y-0 right-0 w-11 flex items-center justify-center z-10 text-slate-400 hover:text-slate-200 transition-colors touch-manipulation"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>

@@ -39,6 +39,7 @@ function EnrollFaceContent() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [streamActive, setStreamActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   // Scanning & capturing state
   const [isScanning, setIsScanning] = useState(false);
@@ -128,7 +129,7 @@ function EnrollFaceContent() {
       try {
         setCameraError(null);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' },
+          video: { width: 640, height: 480, facingMode: facingMode },
           audio: false
         });
         videoRef.current.srcObject = stream;
@@ -150,7 +151,7 @@ function EnrollFaceContent() {
       }
       setStreamActive(false);
     };
-  }, [loadingModels, capturedImage]);
+  }, [loadingModels, capturedImage, facingMode]);
 
   // Start face detection loop or simulation loop when camera is active
   useEffect(() => {
@@ -369,6 +370,9 @@ function EnrollFaceContent() {
     );
   }
 
+  const isMirror = facingMode === 'user';
+  const mirrorClass = isMirror ? 'scale-x-[-1]' : '';
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       {/* Title Header */}
@@ -460,17 +464,29 @@ function EnrollFaceContent() {
               </div>
             ) : null}
 
+            {/* Switch Camera Button floating on top of viewport (Mobile only or always visible) */}
+            {streamActive && !capturedImage && (
+              <button
+                type="button"
+                onClick={() => setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'))}
+                title="Switch Camera"
+                className="absolute top-4 right-4 z-20 w-9 h-9 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer hover:bg-black/80 hover:border-white/20 active:scale-95 flex items-center justify-center"
+              >
+                <RefreshCw className="w-4 h-4 text-indigo-400" />
+              </button>
+            )}
+
             {/* Raw video & Landmarks canvas */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover scale-x-[-1]"
+              className={`w-full h-full object-cover ${mirrorClass}`}
             />
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none scale-x-[-1]"
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${mirrorClass}`}
             />
 
             {/* Error fallback state */}

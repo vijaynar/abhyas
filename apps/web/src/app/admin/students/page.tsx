@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 
 interface StudentItem {
   id: string;
@@ -70,6 +71,29 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
+
+  const batchOptions = [
+    { value: 'all', label: 'All Batches' },
+    ...batches.map((b) => ({
+      value: b.id,
+      label: `${b.name}${b.classes ? ` (${b.classes.name})` : ''}`
+    }))
+  ];
+
+  const formBatchOptions = [
+    { value: '', label: 'Select Batch' },
+    ...batches.map((b) => ({
+      value: b.id,
+      label: b.name
+    }))
+  ];
+
+  const statusOptions = [
+    { value: 'active', label: 'Active Students' },
+    { value: 'inactive', label: 'Inactive Students' },
+    { value: 'suspended', label: 'Suspended Students' },
+    { value: 'all', label: 'All Statuses' }
+  ];
 
   // Form states for creating a student
   const [showAddModal, setShowAddModal] = useState(false);
@@ -256,40 +280,26 @@ export default function StudentsPage() {
           </div>
 
           {/* Batch Selector */}
-          <div>
-            <select
-              value={selectedBatch}
-              onChange={(e) => {
-                setSelectedBatch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-3.5 h-10 rounded-xl glass-input text-xs"
-            >
-              <option value="all">All Batches</option>
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} {b.classes ? `(${b.classes.name})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            value={selectedBatch}
+            onChange={(val) => {
+              setSelectedBatch(val);
+              setPage(1);
+            }}
+            options={batchOptions}
+            placeholder="All Batches"
+          />
 
           {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-3.5 h-10 rounded-xl glass-input text-xs"
-            >
-              <option value="active">Active Students</option>
-              <option value="inactive">Inactive Students</option>
-              <option value="suspended">Suspended Students</option>
-              <option value="all">All Statuses</option>
-            </select>
-          </div>
+          <CustomSelect
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val);
+              setPage(1);
+            }}
+            options={statusOptions}
+            placeholder="Active Students"
+          />
 
           {/* Filter Action */}
           <div className="flex gap-2">
@@ -322,12 +332,12 @@ export default function StudentsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.01]">
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Custom ID</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Student Name</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Batch Schedule</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Face Bio Status</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Joined Date</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[95px]">Custom ID</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[30%] min-w-[220px]">Student Name</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[20%] min-w-[180px]">Batch Schedule</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[140px]">Face Bio Status</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[120px]">Joined Date</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right w-[10%] min-w-[110px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -586,19 +596,12 @@ export default function StudentsPage() {
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold block mb-1.5">Assigned Batch Schedule</label>
-                    <select
-                      required
+                    <CustomSelect
                       value={batchId}
-                      onChange={(e) => setBatchId(e.target.value)}
-                      className="w-full px-3.5 h-10 rounded-xl glass-input text-xs"
-                    >
-                      <option value="">Select Batch</option>
-                      {batches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setBatchId}
+                      options={formBatchOptions}
+                      placeholder="Select Batch"
+                    />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold block mb-1.5">Joining Date</label>

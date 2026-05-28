@@ -567,13 +567,13 @@ export default function AdminDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-400">
-                  <th className="p-3">Coach</th>
-                  <th className="p-3">Expertise</th>
-                  <th className="p-3">Availability</th>
-                  <th className="p-3 text-center">Batches</th>
-                  <th className="p-3 text-center">Sessions</th>
-                  <th className="p-3 text-right">Rate / Session</th>
-                  <th className="p-3 text-right">Est. Earnings</th>
+                  <th className="p-3 w-[25%] min-w-[160px]">Coach</th>
+                  <th className="p-3 w-[15%] min-w-[120px]">Expertise</th>
+                  <th className="p-3 w-[20%] min-w-[160px]">Availability</th>
+                  <th className="p-3 text-center w-[10%] min-w-[70px]">Batches</th>
+                  <th className="p-3 text-center w-[10%] min-w-[70px]">Sessions</th>
+                  <th className="p-3 text-right w-[10%] min-w-[100px]">Rate / Session</th>
+                  <th className="p-3 text-right w-[10%] min-w-[110px]">Est. Earnings</th>
                 </tr>
               </thead>
               <tbody className="text-xs divide-y divide-white/5">

@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 
 interface FineItem {
   id: string;
@@ -399,13 +400,13 @@ export default function FinesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.01]">
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Date Issued</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Student ID</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Student Name</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Reason for Penalty</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Fine Amount</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Verification Actions</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[120px]">Date Issued</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[110px]">Student ID</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[150px]">Student Name</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[25%] min-w-[200px]">Reason for Penalty</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[100px]">Fine Amount</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[90px]">Status</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right w-[10%] min-w-[150px]">Verification Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -634,24 +635,28 @@ export default function FinesPage() {
 
             <form onSubmit={handleCreateFineSubmit} className="space-y-4">
               
-              <div>
-                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
-                  Select Student Profile
-                </label>
-                <select
-                  required
-                  value={selectedStudentId}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3.5 h-10 rounded-xl glass-input text-xs"
-                >
-                  <option value="">Choose Student...</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.users?.first_name} {s.users?.last_name} ({s.student_custom_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {(() => {
+                const studentOptions = [
+                  { value: '', label: 'Choose Student...' },
+                  ...students.map((s) => ({
+                    value: s.id,
+                    label: `${s.users?.first_name} ${s.users?.last_name} (${s.student_custom_id})`
+                  }))
+                ];
+                return (
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
+                      Select Student Profile
+                    </label>
+                    <CustomSelect
+                      value={selectedStudentId}
+                      onChange={setSelectedStudentId}
+                      options={studentOptions}
+                      placeholder="Choose Student..."
+                    />
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">

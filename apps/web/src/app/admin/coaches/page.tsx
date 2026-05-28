@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -25,6 +25,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase';
+import CustomSelect from '../components/CustomSelect';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -112,11 +113,11 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="glass-panel rounded-2xl p-5 flex items-center gap-4 hover:border-white/20 transition-all duration-300">
-      <div className={`p-3 rounded-xl ${accent} flex-shrink-0`}>{icon}</div>
+    <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-white/20 transition-all duration-300">
+      <div className={`p-2.5 sm:p-3 rounded-xl ${accent} flex-shrink-0 self-start sm:self-auto`}>{icon}</div>
       <div>
-        <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-slate-100 text-2xl font-bold mt-0.5">{value}</p>
+        <p className="text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wide sm:tracking-wider leading-tight">{label}</p>
+        <p className="text-slate-100 text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1">{value}</p>
       </div>
     </div>
   );
@@ -825,20 +826,21 @@ export default function CoachesPage() {
               <thead>
                 <tr className="border-b border-white/5">
                   {[
-                    'Coach',
-                    'Phone',
-                    'Expertise',
-                    'Availability',
-                    'Rate (₹/hr)',
-                    'Batches',
-                    'Status',
-                    'Actions',
+                    { name: 'Coach', minWidth: '180px' },
+                    { name: 'Phone', minWidth: '110px' },
+                    { name: 'Expertise', minWidth: '130px' },
+                    { name: 'Availability', minWidth: '160px' },
+                    { name: 'Rate (₹/hr)', minWidth: '100px' },
+                    { name: 'Batches', minWidth: '160px' },
+                    { name: 'Status', minWidth: '90px' },
+                    { name: 'Actions', minWidth: '140px' },
                   ].map((h) => (
                     <th
-                      key={h}
+                      key={h.name}
+                      style={{ minWidth: h.minWidth }}
                       className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3 whitespace-nowrap"
                     >
-                      {h}
+                      {h.name}
                     </th>
                   ))}
                 </tr>
@@ -1603,7 +1605,7 @@ export default function CoachesPage() {
                             className="rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/15 overflow-hidden"
                           >
                             {/* Batch info row */}
-                            <div className="flex items-start justify-between gap-3 p-4">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 p-4">
                               <div className="flex-1 min-w-0">
                                 <p className="text-slate-100 text-sm font-semibold truncate">{batch.name}</p>
                                 <p className="text-slate-400 text-xs mt-0.5">
@@ -1628,19 +1630,19 @@ export default function CoachesPage() {
                               </div>
                               {/* Actions */}
                               {!isEditingDays && (
-                                <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
+                                <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto justify-end flex-shrink-0">
                                   <button
                                     onClick={() => {
                                       ensureDaySelection(batch.id, assignment.assigned_days ?? batchDays);
                                       setEditingDaysFor(assignment.id);
                                     }}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-all"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-all"
                                   >
                                     <Edit2 className="w-3 h-3" /> Days
                                   </button>
                                   <button
                                     onClick={() => handleRemoveAssignment(batch.id)}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 transition-all"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 transition-all"
                                   >
                                     <XCircle className="w-3 h-3" /> Remove
                                   </button>
@@ -1713,25 +1715,27 @@ export default function CoachesPage() {
                     </div>
                     <div className="space-y-2">
                       {pendingAssignments.map((assignment) => (
-                        <div key={assignment.id} className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/[0.04] border border-amber-500/15">
+                        <div key={assignment.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-amber-500/[0.04] border border-amber-500/15">
                           <div className="flex-1 min-w-0">
                             <p className="text-slate-200 text-xs font-semibold truncate">{assignment.batch!.name}</p>
                             <p className="text-slate-500 text-[10px] mt-0.5">
                               {assignment.batch!.start_time?.slice(0,5)} – {assignment.batch!.end_time?.slice(0,5)}
                             </p>
                           </div>
-                          <button
-                            onClick={() => handleApproveAssignment(assignment.id)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all"
-                          >
-                            <CheckCircle2 className="w-3 h-3" /> Approve
-                          </button>
-                          <button
-                            onClick={() => handleRejectAssignment(assignment.id)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 transition-all"
-                          >
-                            <XCircle className="w-3 h-3" /> Reject
-                          </button>
+                          <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto justify-end flex-shrink-0">
+                            <button
+                              onClick={() => handleApproveAssignment(assignment.id)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectAssignment(assignment.id)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 transition-all"
+                            >
+                              <XCircle className="w-3 h-3" /> Reject
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1751,28 +1755,32 @@ export default function CoachesPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div>
-                        <label className="text-slate-400 text-[10px] font-semibold block mb-1.5">Select a batch to assign</label>
-                        <select
-                          value={selectedBatchToAssign}
-                          onChange={(e) => {
-                            const bid = e.target.value;
-                            setSelectedBatchToAssign(bid);
-                            if (bid) {
-                              const b = batches.find(bx => bx.id === bid);
-                              if (b) setBatchDaySelections(prev => ({ ...prev, [bid]: new Set(b.days_of_week ?? []) }));
-                            }
-                          }}
-                          className="w-full h-10 px-3 rounded-xl glass-input text-xs"
-                        >
-                          <option value="" className="bg-[#0f172a]">-- Choose a batch --</option>
-                          {unassignedBatches.map((b) => (
-                            <option key={b.id} value={b.id} className="bg-[#0f172a]">
-                              {b.name}{b.start_time ? ` \u00b7 ${b.start_time.slice(0,5)}\u2013${b.end_time.slice(0,5)}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {(() => {
+                        const unassignedOptions = [
+                          { value: '', label: '-- Choose a batch --' },
+                          ...unassignedBatches.map((b) => ({
+                            value: b.id,
+                            label: `${b.name}${b.start_time ? ` · ${b.start_time.slice(0, 5)}–${b.end_time.slice(0, 5)}` : ''}`
+                          }))
+                        ];
+                        return (
+                          <div>
+                            <label className="text-slate-400 text-[10px] font-semibold block mb-1.5">Select a batch to assign</label>
+                            <CustomSelect
+                              value={selectedBatchToAssign}
+                              onChange={(bid) => {
+                                setSelectedBatchToAssign(bid);
+                                if (bid) {
+                                  const b = batches.find(bx => bx.id === bid);
+                                  if (b) setBatchDaySelections(prev => ({ ...prev, [bid]: new Set(b.days_of_week ?? []) }));
+                                }
+                              }}
+                              options={unassignedOptions}
+                              placeholder="-- Choose a batch --"
+                            />
+                          </div>
+                        );
+                      })()}
                       {pickBatch && pickDays.length > 0 && (
                         <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
                           <div>

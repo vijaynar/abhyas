@@ -14,6 +14,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -560,14 +561,14 @@ export default function BatchesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-300">
-                  <th className="p-4">Batch Name</th>
-                  <th className="p-4">Linked Course / Class</th>
-                  <th className="p-4">Scheduled Hours</th>
-                  <th className="p-4">Active Days</th>
-                  <th className="p-4">Capacity</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Coaches</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <th className="p-4 w-[15%] min-w-[120px]">Batch Name</th>
+                  <th className="p-4 w-[15%] min-w-[130px]">Linked Course / Class</th>
+                  <th className="p-4 w-[15%] min-w-[120px]">Scheduled Hours</th>
+                  <th className="p-4 w-[20%] min-w-[160px]">Active Days</th>
+                  <th className="p-4 w-[10%] min-w-[90px]">Capacity</th>
+                  <th className="p-4 w-[10%] min-w-[80px]">Status</th>
+                  <th className="p-4 w-[15%] min-w-[160px]">Coaches</th>
+                  <th className="p-4 text-right w-[10%] min-w-[80px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-xs divide-y divide-white/5 text-slate-300">
@@ -745,22 +746,21 @@ export default function BatchesPage() {
                 <label className="text-slate-300 text-xs font-semibold block">
                   Link to Academic Class
                 </label>
-                <select
-                  required
-                  disabled={editingBatch !== null}
-                  value={classId}
-                  onChange={(e) => setClassId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl glass-input text-xs"
-                >
-                  <option value="" className="bg-[#0f172a]">
-                    -- Select Class / Course --
-                  </option>
-                  {classesList.map((c) => (
-                    <option key={c.id} value={c.id} className="bg-[#0f172a]">
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const classOptions = [
+                    { value: '', label: '-- Select Class / Course --' },
+                    ...classesList.map((c) => ({ value: c.id, label: c.name }))
+                  ];
+                  return (
+                    <CustomSelect
+                      value={classId}
+                      onChange={setClassId}
+                      options={classOptions}
+                      placeholder="-- Select Class / Course --"
+                      disabled={editingBatch !== null}
+                    />
+                  );
+                })()}
               </div>
 
               {/* Batch Name */}
@@ -1092,33 +1092,32 @@ export default function BatchesPage() {
                       <label className="text-slate-400 text-[10px] font-semibold block">
                         Select Coach
                       </label>
-                      <select
-                        value={selectedCoachId}
-                        onChange={(e) => {
-                          setSelectedCoachId(e.target.value);
-                        }}
-                        className="w-full h-9 px-3 rounded-xl glass-input text-xs"
-                      >
-                        <option value="" className="bg-[#0f172a]">
-                          -- Choose a coach --
-                        </option>
-                        {unassignedCoaches.map((c) => {
-                          const overlaps = slotsOverlap(
-                            c.coach_profile?.availability_slots ?? null,
-                            managingBatch.start_time,
-                            managingBatch.end_time,
-                          );
-                          return (
-                            <option key={c.id} value={c.id} className="bg-[#0f172a]">
-                              {c.first_name} {c.last_name}
-                              {c.coach_profile?.availability_slots
+                      {(() => {
+                        const coachOptions = [
+                          { value: '', label: '-- Choose a coach --' },
+                          ...unassignedCoaches.map((c) => {
+                            const overlaps = slotsOverlap(
+                              c.coach_profile?.availability_slots ?? null,
+                              managingBatch.start_time,
+                              managingBatch.end_time,
+                            );
+                            const label = `${c.first_name} ${c.last_name}${
+                              c.coach_profile?.availability_slots
                                 ? ` — ${c.coach_profile.availability_slots}`
-                                : ''}
-                              {overlaps ? ' ✓' : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
+                                : ''
+                            }${overlaps ? ' ✓' : ''}`;
+                            return { value: c.id, label };
+                          })
+                        ];
+                        return (
+                          <CustomSelect
+                            value={selectedCoachId}
+                            onChange={setSelectedCoachId}
+                            options={coachOptions}
+                            placeholder="-- Choose a coach --"
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* Slot match preview */}

@@ -21,6 +21,7 @@ import {
   Info,
   Camera
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 
 interface AttendanceLog {
   id: string | null; // Null if no log exists yet for this student on this date
@@ -59,6 +60,11 @@ export default function AttendanceLogsPage() {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const batchOptions = batches.map((b) => ({
+    value: b.id,
+    label: `${b.name}${b.classes ? ` (${b.classes.name})` : ''}`
+  }));
 
   // Manual Override Modal/Drawer State
   const [editingLog, setEditingLog] = useState<AttendanceLog | null>(null);
@@ -332,20 +338,13 @@ export default function AttendanceLogsPage() {
           <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
             Select Active Batch
           </label>
-          <div className="relative">
-            <Filter className="absolute left-3.5 top-3 w-4 h-4 text-indigo-400" />
-            <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
-              className="w-full pl-10 pr-4 h-10 rounded-xl glass-input text-xs"
-            >
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} {b.classes ? `(${b.classes.name})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            value={selectedBatch}
+            onChange={setSelectedBatch}
+            options={batchOptions}
+            placeholder="Select Active Batch"
+            icon={<Filter className="w-4 h-4 text-indigo-400" />}
+          />
         </div>
 
         {/* Local Search inside active logs */}
@@ -372,13 +371,13 @@ export default function AttendanceLogsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.01]">
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Student ID</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Name</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Check-in Time</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Method / confidence</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Associated Fine</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Overrides</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[110px]">Student ID</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[20%] min-w-[160px]">Name</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[100px]">Status</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[120px]">Check-in Time</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[20%] min-w-[180px]">Method / confidence</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[100px]">Associated Fine</th>
+                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right w-[10%] min-w-[110px]">Overrides</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
