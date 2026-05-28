@@ -237,10 +237,10 @@ export default function SuperadminPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-            <ShieldAlert className="w-4 h-4" /> Global Platform Console
+            <ShieldAlert className="w-4 h-4" /> Client Management Console
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            SaaS Administration
+            Client Management
           </h1>
         </div>
         <button
@@ -467,7 +467,7 @@ export default function SuperadminPage() {
               {loading ? (
                 <div className="p-12 text-center text-slate-500">
                   <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-[10px] uppercase font-bold tracking-wider">Loading SaaS registries...</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider">Loading Client registries...</p>
                 </div>
               ) : filteredTenants.length === 0 ? (
                 <div className="p-12 text-center text-slate-500">

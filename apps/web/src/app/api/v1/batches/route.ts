@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
+    if (!hasRole(ctx, 'admin', 'superadmin', 'coach')) return err('Forbidden', 403);
 
     const body = await req.json();
     const parsed = CreateBatchSchema.safeParse(body);
@@ -79,6 +79,18 @@ export async function POST(req: Request) {
       .single();
 
     if (error) throw error;
+
+    // If a coach creates a batch, auto-create a pending assignment for them
+    if (ctx.role === 'coach') {
+      await db.from('coach_batch_assignments').insert({
+        tenant_id: ctx.tenantId,
+        coach_id: ctx.userId,
+        batch_id: data.id,
+        status: 'pending',
+        requested_by: ctx.userId,
+      });
+    }
+
     return created(data);
   } catch (e: unknown) {
     return err(e instanceof Error ? e.message : 'Internal server error', 500);

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBrowserClient } from '@/lib/supabase';
-import { Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, Sparkles, X, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -14,6 +14,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createBrowserClient();
+
+  // Forgot password state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetStatus, setResetStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +68,7 @@ export default function LoginPage() {
         if (profile.role === 'student' || profile.role === 'parent') {
           router.push('/student/dashboard');
         } else {
+          // admin, superadmin, coach all go to admin dashboard
           router.push('/admin/dashboard');
         }
         router.refresh();
@@ -68,6 +76,36 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
       setLoading(false);
+    }
+  };
+
+  const openForgotModal = () => {
+    // Pre-fill with whatever the user typed in the login email field if it looks like an email
+    setResetEmail(email.includes('@') ? email : '');
+    setResetStatus('idle');
+    setResetError(null);
+    setShowForgotModal(true);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+
+    setResetLoading(true);
+    setResetError(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) throw error;
+      setResetStatus('success');
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to send reset email. Please try again.');
+      setResetStatus('error');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -126,9 +164,13 @@ export default function LoginPage() {
               <label className="text-slate-300 text-xs font-semibold tracking-wide block">
                 Password
               </label>
-              <a href="#" className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors">
+              <button
+                type="button"
+                onClick={openForgotModal}
+                className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors cursor-pointer"
+              >
                 Forgot password?
-              </a>
+              </button>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
@@ -174,6 +216,109 @@ export default function LoginPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── Forgot Password Modal ── */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm glass-panel p-6 rounded-2xl relative">
+            {/* Close button */}
+            <button
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <Lock className="w-4 h-4 text-indigo-400" />
+              </div>
+              <h2 className="text-base font-bold text-white">Reset Password</h2>
+            </div>
+            <p className="text-xs text-slate-400 mb-5 pl-10">
+              Enter your account email and we&apos;ll send a reset link.
+            </p>
+
+            {/* Success state */}
+            {resetStatus === 'success' ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-center animate-in fade-in duration-300">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                </div>
+                <p className="text-sm font-semibold text-slate-100">Reset email sent!</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Check your inbox at <span className="text-indigo-400 font-medium">{resetEmail}</span>. Click the link in the email to set a new password.
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Didn&apos;t receive it? Check your spam folder or{' '}
+                  <button
+                    onClick={() => setResetStatus('idle')}
+                    className="text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                  >
+                    try again
+                  </button>.
+                </p>
+                <button
+                  onClick={() => setShowForgotModal(false)}
+                  className="mt-2 btn-secondary h-9 px-5 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="text-slate-300 text-xs font-semibold tracking-wide block mb-1.5">
+                    Account Email
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                      <Mail className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full h-11 pl-10 pr-4 rounded-xl glass-input text-sm"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                {resetStatus === 'error' && resetError && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs animate-in fade-in duration-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    {resetError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="btn-secondary flex-1 h-10 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading || !resetEmail.trim()}
+                    className="btn-premium flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {resetLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Send Reset Link'
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

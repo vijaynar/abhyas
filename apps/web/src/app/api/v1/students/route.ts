@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
+    if (!hasRole(ctx, 'admin', 'superadmin', 'coach')) return err('Forbidden', 403);
 
     const { searchParams } = new URL(req.url);
     const batchId = searchParams.get('batchId');
@@ -25,6 +26,21 @@ export async function GET(req: Request) {
     const offset = (page - 1) * limit;
 
     const db = adminDb();
+
+    // For coaches: scope to their approved batch IDs
+    let allowedBatchIds: string[] | null = null;
+    if (ctx.role === 'coach') {
+      const { data: assignments } = await db
+        .from('coach_batch_assignments')
+        .select('batch_id')
+        .eq('coach_id', ctx.userId)
+        .eq('tenant_id', ctx.tenantId)
+        .eq('status', 'approved');
+      allowedBatchIds = (assignments || []).map((a: { batch_id: string }) => a.batch_id);
+      if (allowedBatchIds.length === 0) {
+        return ok({ students: [], pagination: { total: 0, page, limit, totalPages: 0 } });
+      }
+    }
 
     let query = db
       .from('students')
@@ -52,6 +68,8 @@ export async function GET(req: Request) {
 
     if (batchId) {
       query = query.eq('batch_id', batchId);
+    } else if (allowedBatchIds) {
+      query = query.in('batch_id', allowedBatchIds);
     }
 
     if (search) {
@@ -81,7 +99,7 @@ export async function POST(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
+    if (!hasRole(ctx, 'admin', 'superadmin', 'coach')) return err('Forbidden', 403);
 
     const body = await req.json();
     const parsed = CreateStudentSchema.safeParse(body);

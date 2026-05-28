@@ -22,6 +22,22 @@ interface KPIMetrics {
   activePayments: number;
 }
 
+interface CoachStat {
+  id: string;
+  first_name: string;
+  last_name: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  coach_profile: {
+    expertise: string | null;
+    availability_slots: string | null;
+    hourly_rate: number;
+  } | null;
+  approvedBatchCount: number;
+  estimatedEarnings: number;
+  totalSessions: number;
+}
+
 interface ChartItem {
   label: string;
   key: string;
@@ -66,6 +82,8 @@ export default function AdminDashboard() {
     pendingFines: 0,
     activePayments: 0,
   });
+  const [coachStats, setCoachStats] = useState<CoachStat[]>([]);
+  const [userRole, setUserRole] = useState<string>('admin');
   const [attendanceFeed, setAttendanceFeed] = useState<AttendanceFeedItem[]>([]);
   const [verificationQueue, setVerificationQueue] = useState<FinePaymentItem[]>([]);
   const [chartData, setChartData] = useState<ChartItem[]>([]);
@@ -85,12 +103,14 @@ export default function AdminDashboard() {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       if (!profile) return;
       const tenantId = profile.tenant_id;
+      const role = profile.role;
+      setUserRole(role);
       const todayStr = new Date().toISOString().split('T')[0];
 
       // 1. Fetch Today's Attendance Logs (Present / Absent)
@@ -185,6 +205,64 @@ export default function AdminDashboard() {
       setAttendanceFeed((feedData || []) as unknown as AttendanceFeedItem[]);
       setVerificationQueue((pendingPayments || []) as unknown as FinePaymentItem[]);
       setChartData(monthsList);
+
+      // 6. Fetch coach stats (admins only)
+      if (role === 'admin' || role === 'superadmin') {
+        const { data: coaches } = await supabase
+          .from('users')
+          .select(`
+            id, first_name, last_name, avatar_url, is_active,
+            coach_profile:coaches(expertise, availability_slots, hourly_rate),
+            batch_assignments:coach_batch_assignments!coach_batch_assignments_coach_id_fkey(id, status, batch_id)
+          `)
+          .eq('tenant_id', tenantId)
+          .eq('role', 'coach')
+          .eq('is_active', true);
+
+        if (coaches && coaches.length > 0) {
+          const allBatchIds = coaches.flatMap((c: any) =>
+            (c.batch_assignments || []).filter((a: any) => a.status === 'approved').map((a: any) => a.batch_id)
+          );
+
+          let sessionCounts: Record<string, number> = {};
+          if (allBatchIds.length > 0) {
+            const { data: sessions } = await supabase
+              .from('attendance_logs')
+              .select('batch_id, date')
+              .eq('tenant_id', tenantId)
+              .in('batch_id', allBatchIds);
+
+            if (sessions) {
+              const batchDateSets: Record<string, Set<string>> = {};
+              sessions.forEach((s: any) => {
+                if (!batchDateSets[s.batch_id]) batchDateSets[s.batch_id] = new Set();
+                batchDateSets[s.batch_id].add(s.date);
+              });
+              Object.entries(batchDateSets).forEach(([batchId, dates]) => {
+                sessionCounts[batchId] = dates.size;
+              });
+            }
+          }
+
+          const stats: CoachStat[] = coaches.map((c: any) => {
+            const approved = (c.batch_assignments || []).filter((a: any) => a.status === 'approved');
+            const totalSessions = approved.reduce((sum: number, a: any) => sum + (sessionCounts[a.batch_id] || 0), 0);
+            const hourlyRate = c.coach_profile?.hourly_rate ?? 500;
+            return {
+              id: c.id,
+              first_name: c.first_name,
+              last_name: c.last_name,
+              avatar_url: c.avatar_url,
+              is_active: c.is_active,
+              coach_profile: c.coach_profile,
+              approvedBatchCount: approved.length,
+              estimatedEarnings: totalSessions * hourlyRate,
+              totalSessions,
+            };
+          });
+          setCoachStats(stats);
+        }
+      }
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -326,6 +404,54 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* ── KPI Cards Grid — Coach KPI for admins ── */}
+      {(userRole === 'admin' || userRole === 'superadmin') && coachStats.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {/* Active Coaches */}
+          <div className="glass-panel glass-panel-hover p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/5 blur-2xl group-hover:bg-purple-500/10 transition-colors" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-xs font-bold tracking-wide uppercase">Active Coaches</span>
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-3xl font-black text-white">{coachStats.length}</span>
+              <span className="text-xs text-slate-500 font-semibold block mt-1">On roster</span>
+            </div>
+          </div>
+          {/* Total Sessions */}
+          <div className="glass-panel glass-panel-hover p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-cyan-500/5 blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-xs font-bold tracking-wide uppercase">Total Sessions</span>
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-3xl font-black text-white">{coachStats.reduce((s, c) => s + c.totalSessions, 0)}</span>
+              <span className="text-xs text-slate-500 font-semibold block mt-1">Sessions conducted</span>
+            </div>
+          </div>
+          {/* Coach Earnings */}
+          <div className="glass-panel glass-panel-hover p-6 rounded-2xl relative overflow-hidden group border-purple-500/20">
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/10 blur-2xl group-hover:bg-purple-500/20 transition-colors" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-200 text-xs font-extrabold tracking-wide uppercase">Est. Coach Payouts</span>
+              <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                <IndianRupee className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-3xl font-black text-white">₹{coachStats.reduce((s, c) => s + c.estimatedEarnings, 0).toLocaleString()}</span>
+              <span className="text-xs text-purple-400 font-bold block mt-1">Total estimated</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Month-by-Month Fines Collection Trends ── */}
       <div className="glass-panel p-6 rounded-3xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
@@ -424,6 +550,78 @@ export default function AdminDashboard() {
           })()
         )}
       </div>
+
+      {/* ── Coach Earnings & Availability Registry (Admins only) ── */}
+      {(userRole === 'admin' || userRole === 'superadmin') && coachStats.length > 0 && (
+        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-purple-500/5 blur-3xl pointer-events-none" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-400" /> Coach Earnings & Availability Registry
+              </h2>
+              <p className="text-[11px] text-slate-400">Session earnings, availability slots, and batch assignments per coach</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-400">
+                  <th className="p-3">Coach</th>
+                  <th className="p-3">Expertise</th>
+                  <th className="p-3">Availability</th>
+                  <th className="p-3 text-center">Batches</th>
+                  <th className="p-3 text-center">Sessions</th>
+                  <th className="p-3 text-right">Rate / Session</th>
+                  <th className="p-3 text-right">Est. Earnings</th>
+                </tr>
+              </thead>
+              <tbody className="text-xs divide-y divide-white/5">
+                {coachStats.map((coach) => (
+                  <tr key={coach.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300 font-bold text-xs flex-shrink-0">
+                          {coach.avatar_url
+                            ? <img src={coach.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                            : `${coach.first_name[0]}${coach.last_name[0]}`
+                          }
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-200">{coach.first_name} {coach.last_name}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 text-slate-400 max-w-[140px]">
+                      <span className="truncate block">{coach.coach_profile?.expertise || '—'}</span>
+                    </td>
+                    <td className="p-3 max-w-[160px]">
+                      {coach.coach_profile?.availability_slots
+                        ? <span className="text-indigo-300 text-[10px] font-semibold leading-tight block">{coach.coach_profile.availability_slots}</span>
+                        : <span className="text-slate-600 italic">Not set</span>
+                      }
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold">
+                        {coach.approvedBatchCount}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className="text-slate-200 font-bold">{coach.totalSessions}</span>
+                    </td>
+                    <td className="p-3 text-right text-slate-300 font-mono">
+                      ₹{(coach.coach_profile?.hourly_rate ?? 500).toLocaleString()}
+                    </td>
+                    <td className="p-3 text-right">
+                      <span className="text-purple-300 font-black">₹{coach.estimatedEarnings.toLocaleString()}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Main Dashboard Split Panels ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

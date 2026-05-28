@@ -16,6 +16,7 @@ import {
   Sparkles,
   User,
   Users,
+  UserCog,
   X,
   BarChart2,
   ShieldAlert
@@ -62,8 +63,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        if (userProfile.role !== 'admin' && userProfile.role !== 'superadmin') {
-          // If not admin, eject to student dashboard
+        if (userProfile.role !== 'admin' && userProfile.role !== 'superadmin' && userProfile.role !== 'coach') {
+          // If not admin/coach, eject to student dashboard
           router.push('/student/dashboard');
           return;
         }
@@ -85,19 +86,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.refresh();
   };
 
+  const isCoach = profile?.role === 'coach';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
+
   const navItems = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Classes', href: '/admin/classes', icon: BookOpen },
     { name: 'Batches', href: '/admin/batches', icon: Calendar },
     { name: 'Students', href: '/admin/students', icon: Users },
+    ...(isAdmin ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
     { name: 'Attendance', href: '/admin/attendance', icon: FileText },
     { name: 'Fines & Payments', href: '/admin/fines', icon: IndianRupee },
     { name: 'Reports', href: '/admin/reports', icon: BarChart2 },
-    { name: 'Portal Settings', href: '/admin/settings', icon: Settings },
+    ...(isCoach ? [{ name: 'My Profile', href: '/admin/profile', icon: User }] : []),
+    ...(isAdmin ? [{ name: 'Portal Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
   if (profile?.role === 'superadmin') {
-    navItems.push({ name: 'SaaS Platform', href: '/admin/superadmin', icon: ShieldAlert });
+    navItems.push({ name: 'Clients', href: '/admin/superadmin', icon: ShieldAlert });
   }
 
   if (loading) {

@@ -90,6 +90,11 @@ export default function StudentDashboard() {
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securitySuccess, setSecuritySuccess] = useState<string | null>(null);
 
+  // Photo upload states
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ id: string; first_name: string; last_name: string; avatar_url: string | null } | null>(null);
+
   const supabase = createBrowserClient();
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -124,6 +129,35 @@ export default function StudentDashboard() {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setPhotoUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `avatar_${user.id}_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('student-portraits')
+        .upload(filename, file, { contentType: file.type, upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: { publicUrl } } = supabase.storage.from('student-portraits').getPublicUrl(filename);
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+      if (updateErr) throw updateErr;
+      setPhotoUrl(publicUrl);
+      setUserProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev);
+    } catch (err: any) {
+      console.error('Photo upload failed:', err);
+      alert('Failed to upload photo: ' + err.message);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const loadDashboardData = async (isRef = false) => {
     if (isRef) setRefreshing(true);
     else setLoading(true);
@@ -148,6 +182,17 @@ export default function StudentDashboard() {
         .single();
 
       if (stuErr) throw stuErr;
+
+      // Also fetch user profile for avatar
+      const { data: userRec } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, avatar_url')
+        .eq('id', userId)
+        .single();
+      if (userRec) {
+        setUserProfile(userRec);
+        setPhotoUrl(userRec.avatar_url);
+      }
 
       // 2. Fetch student's attendance records
       const { data: attLogs, error: attErr } = await supabase
@@ -293,16 +338,34 @@ export default function StudentDashboard() {
     <div className="space-y-8">
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-            <Sparkles className="w-4 h-4" /> Student Portal Overview
+        <div className="flex items-center gap-4">
+          {/* Avatar with upload */}
+          <div className="relative group flex-shrink-0">
+            <div className="w-16 h-16 rounded-full bg-indigo-500/10 border-2 border-indigo-500/30 overflow-hidden flex items-center justify-center text-indigo-300 font-black text-lg">
+              {photoUrl
+                ? <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                : <span>{userProfile?.first_name?.[0] || 'S'}{userProfile?.last_name?.[0] || 'T'}</span>
+              }
+            </div>
+            <label className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center">
+              {photoUploading
+                ? <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                : <Upload className="w-5 h-5 text-white" />
+              }
+              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={photoUploading} />
+            </label>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            My Attendance Dashboard
-          </h1>
-          <p className="text-xs text-slate-500 font-mono mt-0.5">
-            Roll Ref: {data.student?.student_custom_id || 'Not Assigned'}
-          </p>
+          <div>
+            <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
+              <Sparkles className="w-4 h-4" /> Student Portal Overview
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">
+              My Attendance Dashboard
+            </h1>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">
+              Roll Ref: {data.student?.student_custom_id || 'Not Assigned'}
+            </p>
+          </div>
         </div>
 
         <button
