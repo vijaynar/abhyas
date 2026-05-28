@@ -12,8 +12,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
+  Palette,
   Settings,
   Sparkles,
+  Sun,
   User,
   Users,
   UserCog,
@@ -21,6 +24,8 @@ import {
   BarChart2,
   ShieldAlert
 } from 'lucide-react';
+import ThemeSelector from './components/ThemeSelector';
+import { useTheme } from '@/lib/theme';
 
 interface UserProfile {
   id: string;
@@ -38,6 +43,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
+  const { mode, toggleMode } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createBrowserClient();
@@ -108,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center relative bg-[#060814]">
+      <div className="min-h-screen flex flex-col items-center justify-center relative" style={{ backgroundColor: 'var(--background)' }}>
         <div className="radial-mesh-bg" />
         <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
         <p className="text-slate-400 text-xs font-semibold tracking-widest mt-4 uppercase">
@@ -121,7 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!profile) return null;
 
   return (
-    <div className="min-h-screen flex bg-[#060814] text-slate-100 relative">
+    <div className="min-h-screen flex relative" style={{ backgroundColor: 'var(--background)', color: 'var(--foreground)' }}>
       {/* Background Animated Blobs */}
       <div className="radial-mesh-bg" />
       <div className="absolute top-10 left-10 w-96 h-96 rounded-full bg-indigo-600/5 blur-3xl pointer-events-none" />
@@ -200,7 +207,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Sidebar Bottom Profile & Logout Footer */}
-        <div className="p-4 border-t border-white/10 space-y-4">
+        <div className="p-4 border-t border-white/10 space-y-3">
+          {/* Theme + Mode quick controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTheme(!showTheme)}
+              title="Change theme"
+              className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all"
+            >
+              <Palette className="w-3.5 h-3.5" style={{ color: 'var(--primary)' }} />
+              Themes
+            </button>
+            <button
+              onClick={toggleMode}
+              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-all flex-shrink-0"
+            >
+              {mode === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-indigo-400">
               <User className="w-5 h-5" />
@@ -231,6 +257,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </div>
       </main>
+
+      {/* Theme Selector Panel */}
+      {showTheme && <ThemeSelector onClose={() => setShowTheme(false)} />}
 
       {/* Mobile Drawer Backdrop */}
       {sidebarOpen && (

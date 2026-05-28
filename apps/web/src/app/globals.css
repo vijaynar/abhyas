@@ -1,98 +1,485 @@
 @import "tailwindcss";
 
-/* ── Deep Slate & Indigo Glow Color System ── */
+/* ════════════════════════════════════════════════════════════
+   UPASTHITI — Theme CSS Variable System
+   All colours flow through these vars. ThemeProvider updates
+   them at runtime so every component inherits the change.
+   ════════════════════════════════════════════════════════════ */
 :root {
-  --background: #060814; /* Deep Slate Space */
-  --foreground: #f1f5f9; /* Slate 100 */
-  
-  --panel-bg: rgba(15, 23, 42, 0.45); /* Semi-transparent Slate 900 */
-  --panel-border: rgba(99, 102, 241, 0.15); /* Light Indigo Translucent */
-  
-  --primary: #6366f1; /* Indigo 500 */
-  --primary-glow: rgba(99, 102, 241, 0.5);
-  --primary-hover: #4f46e5; /* Indigo 600 */
-  
-  --accent: #a855f7; /* Purple 500 */
-  --accent-glow: rgba(168, 85, 247, 0.4);
-  
-  --success: #10b981; /* Emerald 500 */
-  --success-glow: rgba(16, 185, 129, 0.25);
-  
-  --warning: #f59e0b; /* Amber 500 */
-  --warning-glow: rgba(245, 158, 11, 0.25);
-  
-  --danger: #ef4444; /* Red 500 */
-  --danger-glow: rgba(239, 68, 68, 0.25);
+  /* ── Canvas ── */
+  --background:           #060814;
+  --foreground:           #f1f5f9;
+  --foreground-muted:     #94a3b8;
+  --foreground-subtle:    #64748b;
+
+  /* ── Panel / Glass ── */
+  --panel-bg:             rgba(15, 23, 42, 0.45);
+  --panel-border:         rgba(99, 102, 241, 0.15);
+  --glass-bg:             rgba(15, 23, 42, 0.60);
+  --glass-input-bg:       rgba(15, 23, 42, 0.60);
+  --glass-input-border:   rgba(255, 255, 255, 0.08);
+  --track-bg:             rgba(6, 8, 20, 0.30);
+
+  /* ── Hover / subtle overlays ── */
+  --overlay-xs:           rgba(255, 255, 255, 0.04);
+  --overlay-sm:           rgba(255, 255, 255, 0.06);
+  --overlay-md:           rgba(255, 255, 255, 0.10);
+  --overlay-border:       rgba(255, 255, 255, 0.08);
+  --overlay-border-md:    rgba(255, 255, 255, 0.15);
+
+  /* ── Primary ── */
+  --primary:              #6366f1;
+  --primary-glow:         rgba(99, 102, 241, 0.50);
+  --primary-hover:        #4f46e5;
+
+  /* ── Accent ── */
+  --accent:               #a855f7;
+  --accent-glow:          rgba(168, 85, 247, 0.40);
+
+  /* ── Semantic ── */
+  --success:              #10b981;
+  --success-glow:         rgba(16, 185, 129, 0.25);
+  --warning:              #f59e0b;
+  --warning-glow:         rgba(245, 158, 11, 0.25);
+  --danger:               #ef4444;
+  --danger-glow:          rgba(239, 68, 68, 0.25);
+
+  /* ── Glow / scrollbar ── */
+  --glow-primary:         0 0 15px rgba(99, 102, 241, 0.50);
+  --scroll-thumb:         rgba(99, 102, 241, 0.30);
+  --scroll-thumb-hover:   rgba(99, 102, 241, 0.60);
+  --radial-a:             rgba(99, 102, 241, 0.12);
+  --radial-b:             rgba(168, 85, 247, 0.10);
 
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
-/* Force dark mode canvas styles */
+/* ════════════════════════════════════════════════════════════
+   LIGHT MODE — applied when ThemeProvider sets data-mode="light"
+   on <html>. Overrides every variable + Tailwind utility class
+   that is hardcoded throughout the app.
+   ════════════════════════════════════════════════════════════ */
+[data-mode="light"] {
+  color-scheme: light;
+
+  --background:           #f1f5f9;
+  --foreground:           #0f172a;
+  --foreground-muted:     #475569;
+  --foreground-subtle:    #94a3b8;
+
+  --panel-bg:             rgba(255, 255, 255, 0.82);
+  --panel-border:         rgba(0, 0, 0, 0.08);
+  --glass-bg:             rgba(255, 255, 255, 0.92);
+  --glass-input-bg:       rgba(255, 255, 255, 0.92);
+  --glass-input-border:   rgba(0, 0, 0, 0.12);
+  --track-bg:             rgba(0, 0, 0, 0.05);
+
+  --overlay-xs:           rgba(0, 0, 0, 0.03);
+  --overlay-sm:           rgba(0, 0, 0, 0.05);
+  --overlay-md:           rgba(0, 0, 0, 0.07);
+  --overlay-border:       rgba(0, 0, 0, 0.08);
+  --overlay-border-md:    rgba(0, 0, 0, 0.14);
+
+  --glow-primary:         0 0 15px var(--primary-glow);
+  --scroll-thumb:         var(--primary-glow);
+  --scroll-thumb-hover:   var(--primary);
+}
+
+/* ──────────────────────────────────────────────────────────
+   TEXT COLOURS
+   Strategy: text-white → near black. text-slate-* → proper
+   dark scale. Then punch exceptions back to white where the
+   parent element has a solid coloured background.
+   ────────────────────────────────────────────────────────── */
+
+/* text-white → very dark in light mode */
+[data-mode="light"] .text-white {
+  color: #0f172a !important;
+}
+
+/* text-slate-* remapped to readable dark scale */
+[data-mode="light"] .text-slate-50,
+[data-mode="light"] .text-slate-100  { color: #0f172a !important; }
+[data-mode="light"] .text-slate-200  { color: #1e293b !important; }
+[data-mode="light"] .text-slate-300  { color: #334155 !important; }
+[data-mode="light"] .text-slate-400  { color: #64748b !important; }
+[data-mode="light"] .text-slate-500  { color: #94a3b8 !important; }
+[data-mode="light"] .text-slate-600  { color: #94a3b8 !important; }
+[data-mode="light"] .text-slate-700  { color: #cbd5e1 !important; }
+
+/* Restore white text ONLY inside SOLID coloured backgrounds (bg-*-5xx / bg-*-6xx / bg-*-7xx)
+   NOT transparent washes like bg-indigo-950/20 which are near-white in light mode */
+[data-mode="light"] [class*="bg-indigo-5"] .text-white,
+[data-mode="light"] [class*="bg-indigo-6"] .text-white,
+[data-mode="light"] [class*="bg-indigo-7"] .text-white,
+[data-mode="light"] [class*="bg-emerald-5"] .text-white,
+[data-mode="light"] [class*="bg-emerald-6"] .text-white,
+[data-mode="light"] [class*="bg-red-5"] .text-white,
+[data-mode="light"] [class*="bg-red-6"] .text-white,
+[data-mode="light"] [class*="bg-amber-5"] .text-white,
+[data-mode="light"] [class*="bg-amber-6"] .text-white,
+[data-mode="light"] [class*="bg-green-5"] .text-white,
+[data-mode="light"] [class*="bg-green-6"] .text-white,
+[data-mode="light"] [class*="bg-cyan-5"] .text-white,
+[data-mode="light"] [class*="bg-cyan-6"] .text-white,
+[data-mode="light"] [class*="bg-violet-5"] .text-white,
+[data-mode="light"] [class*="bg-violet-6"] .text-white,
+[data-mode="light"] [class*="bg-rose-5"] .text-white,
+[data-mode="light"] [class*="bg-rose-6"] .text-white,
+[data-mode="light"] [class*="bg-orange-5"] .text-white,
+[data-mode="light"] [class*="bg-orange-6"] .text-white,
+[data-mode="light"] [class*="bg-purple-5"] .text-white,
+[data-mode="light"] [class*="bg-purple-6"] .text-white,
+[data-mode="light"] [class*="bg-blue-5"] .text-white,
+[data-mode="light"] [class*="bg-blue-6"] .text-white,
+[data-mode="light"] [class*="bg-sky-5"] .text-white,
+[data-mode="light"] [class*="btn-premium"] .text-white,
+[data-mode="light"] .btn-premium .text-white {
+  color: #ffffff !important;
+}
+
+/* Self-coloured solid buttons/badges with both bg and text-white on same element */
+[data-mode="light"] [class*="bg-indigo-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-indigo-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-indigo-7"][class*="text-white"],
+[data-mode="light"] [class*="bg-emerald-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-emerald-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-red-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-red-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-amber-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-amber-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-green-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-green-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-cyan-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-cyan-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-violet-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-violet-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-rose-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-rose-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-purple-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-purple-6"][class*="text-white"],
+[data-mode="light"] [class*="bg-blue-5"][class*="text-white"],
+[data-mode="light"] [class*="bg-blue-6"][class*="text-white"],
+[data-mode="light"] .btn-premium {
+  color: #ffffff !important;
+}
+
+/* Gradient text: make it use the primary colour instead of white gradients */
+[data-mode="light"] .bg-gradient-to-r,
+[data-mode="light"] [class*="bg-gradient"] {
+  /* Don't override the gradient itself, just ensure text contrast */
+}
+[data-mode="light"] .text-transparent {
+  /* Gradient headings - remap to primary colour so they're visible */
+  color: var(--primary) !important;
+  -webkit-text-fill-color: var(--primary) !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   BACKGROUNDS
+   ────────────────────────────────────────────────────────── */
+[data-mode="light"] .bg-\[\#060814\]   { background-color: #f1f5f9 !important; }
+[data-mode="light"] .bg-\[\#0f172a\]   { background-color: #e2e8f0 !important; }
+[data-mode="light"] .bg-slate-800      { background-color: #e2e8f0 !important; }
+[data-mode="light"] .bg-slate-800\/50  { background-color: rgba(226,232,240,0.5) !important; }
+[data-mode="light"] .bg-slate-900      { background-color: #f1f5f9 !important; }
+[data-mode="light"] .bg-slate-900\/90  { background-color: rgba(241,245,249,0.9) !important; }
+[data-mode="light"] .bg-slate-950      { background-color: #f8fafc !important; }
+
+/* White/transparent overlays → dark tints */
+[data-mode="light"] .bg-white\/5          { background-color: rgba(0,0,0,0.03) !important; }
+[data-mode="light"] .bg-white\/10         { background-color: rgba(0,0,0,0.05) !important; }
+[data-mode="light"] .bg-white\/\[0\.02\]  { background-color: rgba(0,0,0,0.02) !important; }
+[data-mode="light"] .bg-white\/\[0\.03\]  { background-color: rgba(0,0,0,0.03) !important; }
+[data-mode="light"] .bg-white\/\[0\.04\]  { background-color: rgba(0,0,0,0.04) !important; }
+[data-mode="light"] .bg-white\/\[0\.05\]  { background-color: rgba(0,0,0,0.04) !important; }
+
+/* Hover backgrounds */
+[data-mode="light"] .hover\:bg-white\/5:hover    { background-color: rgba(0,0,0,0.04) !important; }
+[data-mode="light"] .hover\:bg-white\/10:hover   { background-color: rgba(0,0,0,0.06) !important; }
+[data-mode="light"] .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.04) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   BORDERS
+   ────────────────────────────────────────────────────────── */
+[data-mode="light"] .border-white\/5   { border-color: rgba(0,0,0,0.05) !important; }
+[data-mode="light"] .border-white\/10  { border-color: rgba(0,0,0,0.08) !important; }
+[data-mode="light"] .border-white\/20  { border-color: rgba(0,0,0,0.14) !important; }
+[data-mode="light"] .divide-white\/5   > * + * { border-color: rgba(0,0,0,0.05) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   COMPONENTS
+   ────────────────────────────────────────────────────────── */
+
+/* Dark indigo tinted panels */
+[data-mode="light"] .bg-indigo-950\/20 { background-color: rgba(99,102,241,0.07) !important; }
+[data-mode="light"] .bg-indigo-950\/30 { background-color: rgba(99,102,241,0.10) !important; }
+[data-mode="light"] .border-indigo-500\/10 { border-color: rgba(99,102,241,0.18) !important; }
+
+/* Glass panel */
+[data-mode="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.82) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+[data-mode="light"] .glass-panel-hover:hover {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 0 0 1px var(--primary-glow) !important;
+}
+
+/* Sidebar */
+[data-mode="light"] aside {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-right-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Inputs */
+[data-mode="light"] .glass-input {
+  background: rgba(255,255,255,0.92) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #0f172a !important;
+}
+[data-mode="light"] .glass-input:focus {
+  background: #ffffff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-glow) !important;
+}
+[data-mode="light"] input,
+[data-mode="light"] textarea,
+[data-mode="light"] select { color: #0f172a !important; }
+[data-mode="light"] select option { background: #ffffff; color: #0f172a; }
+
+/* Buttons */
+[data-mode="light"] .btn-secondary {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  color: #0f172a !important;
+}
+[data-mode="light"] .btn-secondary:hover {
+  background: rgba(0,0,0,0.08) !important;
+  border-color: rgba(0,0,0,0.16) !important;
+}
+
+/* Table rows */
+[data-mode="light"] tr:hover td { background-color: rgba(0,0,0,0.02) !important; }
+
+/* hover:text-white → hover:text-slate-900 in light mode */
+[data-mode="light"] .hover\:text-white:hover { color: #0f172a !important; }
+
+/* Scrollbar */
+[data-mode="light"] ::-webkit-scrollbar-track { background: rgba(0,0,0,0.04); }
+
+/* Background mesh */
+[data-mode="light"] .radial-mesh-bg {
+  background-color: #f1f5f9 !important;
+  background-image:
+    radial-gradient(circle at 10% 20%, var(--radial-a) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, var(--radial-b) 0%, transparent 50%) !important;
+}
+[data-mode="light"] .radial-mesh-bg::after { opacity: 0.12; }
+
+/* ──────────────────────────────────────────────────────────
+   MODAL / STICKY HEADERS
+   Tailwind v4 arbitrary-value classes with opacity modifiers
+   are unreliable to select via CSS. Use a semantic pattern
+   that targets sticky+backdrop-blur header divs instead.
+   ────────────────────────────────────────────────────────── */
+
+/* Arbitrary value exact selectors (try both escape styles) */
+[data-mode="light"] .bg-\[\#060814\]\/80,
+[data-mode="light"] .bg-\[\#060814\]\/90,
+[data-mode="light"] .bg-\[\#060814\]\/60,
+[data-mode="light"] .bg-\[\#060814\]\/70 {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+}
+
+/* Semantic catch-all: any sticky + backdrop-blur header inside a modal */
+[data-mode="light"] .sticky.top-0.backdrop-blur-md,
+[data-mode="light"] .sticky.top-0.backdrop-blur-xl,
+[data-mode="light"] .sticky.top-0.backdrop-blur-sm,
+[data-mode="light"] [class*="sticky"][class*="top-0"][class*="backdrop-blur"] {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+  border-bottom-color: rgba(0,0,0,0.07) !important;
+  color: #0f172a !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   TRANSPARENT INDIGO ACTION BUTTONS (bg-indigo-500/20 etc.)
+   In dark mode these are subtle glows. In light mode they're
+   almost invisible. Give them a clear visible tint + border.
+   ────────────────────────────────────────────────────────── */
+[data-mode="light"] .bg-indigo-500\/20.border-indigo-500\/30,
+[data-mode="light"] .bg-indigo-500\/20 {
+  background-color: rgba(99,102,241,0.12) !important;
+  border-color: rgba(99,102,241,0.40) !important;
+}
+[data-mode="light"] .bg-indigo-500\/25 {
+  background-color: rgba(99,102,241,0.16) !important;
+  border-color: rgba(99,102,241,0.45) !important;
+}
+[data-mode="light"] .bg-indigo-600\/30 {
+  background-color: rgba(79,70,229,0.16) !important;
+  border-color: rgba(79,70,229,0.45) !important;
+}
+[data-mode="light"] .hover\:bg-indigo-500\/30:hover {
+  background-color: rgba(99,102,241,0.22) !important;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LIGHT COLOUR TEXT VARIANTS  (designed for dark bg)
+   text-*-300 and text-*-400 are too pale on white.
+   Remap them to their -600/-700 equivalents.
+   Exceptions: leave them alone when inside a coloured bg element.
+   ────────────────────────────────────────────────────────── */
+
+/* Indigo family */
+[data-mode="light"] .text-indigo-300  { color: #4338ca !important; }  /* indigo-700 */
+[data-mode="light"] .text-indigo-400  { color: #4f46e5 !important; }  /* indigo-600 */
+[data-mode="light"] .hover\:text-indigo-300:hover { color: #4338ca !important; }
+
+/* Emerald / green */
+[data-mode="light"] .text-emerald-300 { color: #059669 !important; }  /* emerald-600 */
+[data-mode="light"] .text-emerald-400 { color: #10b981 !important; }  /* emerald-500 */
+[data-mode="light"] .text-green-300   { color: #16a34a !important; }
+[data-mode="light"] .text-green-400   { color: #22c55e !important; }
+
+/* Cyan / sky / blue */
+[data-mode="light"] .text-cyan-300    { color: #0891b2 !important; }  /* cyan-600 */
+[data-mode="light"] .text-cyan-400    { color: #06b6d4 !important; }
+[data-mode="light"] .text-sky-300     { color: #0284c7 !important; }
+[data-mode="light"] .text-blue-300    { color: #2563eb !important; }
+[data-mode="light"] .text-blue-400    { color: #3b82f6 !important; }
+
+/* Violet / purple */
+[data-mode="light"] .text-violet-300  { color: #7c3aed !important; }  /* violet-600 */
+[data-mode="light"] .text-violet-400  { color: #8b5cf6 !important; }
+[data-mode="light"] .text-purple-300  { color: #7e22ce !important; }
+[data-mode="light"] .text-purple-400  { color: #9333ea !important; }
+
+/* Amber / yellow / orange */
+[data-mode="light"] .text-amber-300   { color: #d97706 !important; }  /* amber-600 */
+[data-mode="light"] .text-amber-400   { color: #f59e0b !important; }
+[data-mode="light"] .text-yellow-300  { color: #ca8a04 !important; }
+[data-mode="light"] .text-orange-300  { color: #ea580c !important; }
+
+/* Rose / red / pink */
+[data-mode="light"] .text-red-300     { color: #dc2626 !important; }  /* red-600 */
+[data-mode="light"] .text-red-400     { color: #ef4444 !important; }
+[data-mode="light"] .text-rose-300    { color: #e11d48 !important; }  /* rose-600 */
+[data-mode="light"] .text-rose-400    { color: #f43f5e !important; }
+[data-mode="light"] .text-pink-300    { color: #db2777 !important; }
+[data-mode="light"] .text-pink-400    { color: #ec4899 !important; }
+
+/* Restore light text inside coloured bg elements */
+[data-mode="light"] [class*="bg-indigo-6"] .text-indigo-300,
+[data-mode="light"] [class*="bg-indigo-5"] .text-indigo-300,
+[data-mode="light"] [class*="bg-emerald-6"] .text-emerald-300,
+[data-mode="light"] [class*="bg-red-6"] .text-red-300,
+[data-mode="light"] [class*="bg-rose-6"] .text-rose-300,
+[data-mode="light"] [class*="bg-amber-6"] .text-amber-300,
+[data-mode="light"] [class*="bg-violet-6"] .text-violet-300,
+[data-mode="light"] [class*="bg-cyan-6"] .text-cyan-300,
+[data-mode="light"] [class*="bg-blue-6"] .text-blue-300 {
+  color: #ffffff !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   COLOUR-OPACITY BACKGROUNDS  (transparent colour washes)
+   On dark bg these are subtle. On white they're nearly
+   invisible. Boost them to a visible solid tint.
+   ────────────────────────────────────────────────────────── */
+[data-mode="light"] .bg-indigo-500\/10  { background-color: rgba(99,102,241,0.10) !important; }
+[data-mode="light"] .bg-indigo-500\/15  { background-color: rgba(99,102,241,0.13) !important; }
+[data-mode="light"] .bg-indigo-500\/20  { background-color: rgba(99,102,241,0.14) !important; }
+[data-mode="light"] .bg-indigo-500\/25  { background-color: rgba(99,102,241,0.18) !important; }
+[data-mode="light"] .bg-indigo-500\/30  { background-color: rgba(99,102,241,0.20) !important; }
+[data-mode="light"] .bg-indigo-600\/10  { background-color: rgba(79,70,229,0.10) !important; }
+[data-mode="light"] .bg-indigo-600\/30  { background-color: rgba(79,70,229,0.18) !important; }
+
+[data-mode="light"] .bg-emerald-500\/10 { background-color: rgba(16,185,129,0.10) !important; }
+[data-mode="light"] .bg-emerald-500\/20 { background-color: rgba(16,185,129,0.14) !important; }
+[data-mode="light"] .bg-green-500\/10   { background-color: rgba(34,197,94,0.10) !important; }
+[data-mode="light"] .bg-green-500\/20   { background-color: rgba(34,197,94,0.14) !important; }
+
+[data-mode="light"] .bg-red-500\/10     { background-color: rgba(239,68,68,0.10) !important; }
+[data-mode="light"] .bg-red-500\/20     { background-color: rgba(239,68,68,0.14) !important; }
+[data-mode="light"] .bg-rose-500\/10    { background-color: rgba(244,63,94,0.10) !important; }
+
+[data-mode="light"] .bg-amber-500\/10   { background-color: rgba(245,158,11,0.10) !important; }
+[data-mode="light"] .bg-amber-500\/20   { background-color: rgba(245,158,11,0.14) !important; }
+
+/* ── Tighten slate contrast further ── */
+[data-mode="light"] .text-slate-400  { color: #475569 !important; }  /* slate-600 now */
+[data-mode="light"] .text-slate-500  { color: #64748b !important; }  /* slate-500 */
+[data-mode="light"] .text-slate-600  { color: #94a3b8 !important; }  /* slate-400 = muted */
+
+
+/* ════════════════════════════════════════════════════════════
+   BASE
+   ════════════════════════════════════════════════════════════ */
 html, body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
-/* ── Smooth Scrolling & Selections ── */
-* {
-  box-sizing: border-box;
-  scroll-behavior: smooth;
-}
+* { box-sizing: border-box; scroll-behavior: smooth; }
 
 ::selection {
   background-color: var(--primary-glow);
   color: #ffffff;
 }
 
-/* ── Premium Background Blobs & mesh ── */
+/* ════════════════════════════════════════════════════════════
+   BACKGROUND MESH
+   ════════════════════════════════════════════════════════════ */
 .radial-mesh-bg {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: -10;
   background-color: var(--background);
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(6, 8, 20, 0.5) 0%, var(--background) 100%);
+  background-image:
+    radial-gradient(circle at 10% 20%, var(--radial-a) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, var(--radial-b) 0%, transparent 50%);
   overflow: hidden;
+  transition: background-color 0.35s ease;
 }
 
 .radial-mesh-bg::after {
   content: "";
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 60%);
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle, var(--primary-glow) 0%, transparent 60%);
+  opacity: 0.35;
   animation: slow-rotate 35s linear infinite;
   pointer-events: none;
 }
 
-/* ── Glassmorphism Styling Utility Tokens ── */
+/* ════════════════════════════════════════════════════════════
+   GLASSMORPHISM
+   ════════════════════════════════════════════════════════════ */
 .glass-panel {
   background: var(--panel-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--panel-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.35s ease;
 }
 
 .glass-panel-hover:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 12px 40px 0 rgba(99, 102, 241, 0.12);
+  border-color: var(--primary-glow);
+  box-shadow: 0 12px 40px var(--primary-glow);
 }
 
 .glass-input {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-input-bg);
+  border: 1px solid var(--glass-input-border);
   color: var(--foreground);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -100,20 +487,19 @@ html, body {
 .glass-input:focus {
   outline: none;
   border-color: var(--primary);
-  background: rgba(15, 23, 42, 0.85);
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.3);
+  background: var(--glass-bg);
+  box-shadow: 0 0 14px var(--primary-glow);
 }
 
-/* ── Glow Borders & Indicators ── */
-.glow-border {
-  border: 1px solid var(--panel-border);
-  position: relative;
-}
+/* ════════════════════════════════════════════════════════════
+   GLOW UTILITIES
+   ════════════════════════════════════════════════════════════ */
+.glow-border { border: 1px solid var(--panel-border); position: relative; }
 
 .glow-border::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   border-radius: inherit;
   border: 1px solid transparent;
   background: linear-gradient(135deg, var(--primary), var(--accent)) border-box;
@@ -124,100 +510,63 @@ html, body {
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
+.glow-border:hover::after { opacity: 0.7; }
 
-.glow-border:hover::after {
-  opacity: 0.7;
-}
+.glow-indigo      { box-shadow: var(--glow-primary); }
+.glow-emerald     { box-shadow: 0 0 15px var(--success-glow); }
+.glow-text-indigo { text-shadow: 0 0 8px var(--primary-glow); }
 
-.glow-indigo {
-  box-shadow: 0 0 15px var(--primary-glow);
-}
-
-.glow-emerald {
-  box-shadow: 0 0 15px var(--success-glow);
-}
-
-.glow-text-indigo {
-  text-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
-}
-
-/* ── Custom Interactive Animations ── */
+/* ════════════════════════════════════════════════════════════
+   BUTTONS
+   ════════════════════════════════════════════════════════════ */
 .btn-premium {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 4px 14px var(--primary-glow);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
-
-.btn-premium:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.75);
-}
-
-.btn-premium:active {
-  transform: translateY(1px);
-}
+.btn-premium:hover  { transform: translateY(-2px); box-shadow: 0 6px 20px var(--primary-glow); }
+.btn-premium:active { transform: translateY(1px); }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--overlay-xs);
+  border: 1px solid var(--overlay-border);
   color: var(--foreground);
   transition: all 0.2s ease;
 }
-
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--overlay-md);
+  border-color: var(--overlay-border-md);
 }
 
-/* ── Keyframe Animations ── */
+/* ════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ════════════════════════════════════════════════════════════ */
 @keyframes slow-rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.05);
-  }
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 0.9; transform: scale(1.05); }
 }
 
-.pulsing-glow {
-  animation: pulse-glow 8s ease-in-out infinite;
-}
+.pulsing-glow { animation: pulse-glow 8s ease-in-out infinite; }
 
-/* Hide scrollbars but keep functionality */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* ════════════════════════════════════════════════════════════
+   SCROLLBAR
+   ════════════════════════════════════════════════════════════ */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Premium Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(6, 8, 20, 0.3);
-}
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--track-bg); }
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.3);
+  background: var(--scroll-thumb);
   border-radius: 3px;
+  transition: background 0.2s;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
