@@ -1,0 +1,28 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
+    "@upasthiti/common": "^0.1.0",
+    "@upasthiti/database": "^0.1.0",
+    "expo": "~56.0.3",
+    "expo-av": "^15.1.7",
+    "expo-camera": "^16.1.11",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}
