@@ -1,5 +1,5 @@
-// apps/web/src/middleware.ts
-// Next.js Edge Middleware — runs on every request
+// apps/web/src/proxy.ts
+// Next.js Edge Proxy — runs on every request
 // Responsibilities:
 //   1. Refresh Supabase session cookies so JWT stays valid
 //   2. Redirect unauthenticated users away from protected routes
@@ -8,7 +8,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin');
   const isApiRoute = pathname.startsWith('/api');
 
-  // API routes handle their own auth — skip middleware for them
+  // API routes handle their own auth — skip proxy for them
   if (isApiRoute) {
     return response;
   }

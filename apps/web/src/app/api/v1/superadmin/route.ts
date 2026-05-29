@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     // 4. Fetch linked tenant owner admin emails (includes superadmin users who own a tenant)
     const { data: admins, error: adminsErr } = await db
       .from('users')
-      .select('tenant_id, email, first_name, last_name, phone')
+      .select('tenant_id, email, first_name, last_name, phone, alternate_phone')
       .in('role', ['admin', 'superadmin']);
 
     if (adminsErr) throw adminsErr;
@@ -69,7 +69,11 @@ export async function GET(req: Request) {
         admin: admin ? {
           email: admin.email,
           name: `${admin.first_name} ${admin.last_name}`,
-          phone: admin.phone || 'N/A'
+          phone: [admin.phone, admin.alternate_phone].filter(Boolean).join(' / ') || 'N/A',
+          firstName: admin.first_name,
+          lastName: admin.last_name,
+          primaryPhone: admin.phone,
+          alternatePhone: admin.alternate_phone
         } : null
       };
     });
@@ -98,9 +102,9 @@ export async function POST(req: Request) {
     if (ctx.role !== 'superadmin') return err('Forbidden', 403);
 
     const body = await req.json();
-    const { email, password, firstName, lastName, phone, tenantName, tenantSlug, subscriptionStatus, country, state, city, address } = body;
+    const { email, password, firstName, lastName, phone, alternatePhone, tenantName, tenantSlug, subscriptionStatus, country, state, city, address, clientEmail } = body;
 
-    if (!email || !password || !firstName || !lastName || !tenantName || !tenantSlug) {
+    if (!email || !password || !firstName || !lastName || !tenantName || !tenantSlug || !phone) {
       return err('Missing required onboarding fields.', 422);
     }
 
@@ -116,7 +120,8 @@ export async function POST(req: Request) {
         country: country || 'India',
         state: state || 'Telangana',
         city: city || 'Hyderabad',
-        address: address || null
+        address: address || null,
+        email: clientEmail || null
       })
       .select()
       .single();
@@ -164,7 +169,8 @@ export async function POST(req: Request) {
         role: 'admin',
         first_name: firstName,
         last_name: lastName,
-        phone: phone || null,
+        phone,
+        alternate_phone: alternatePhone || null,
       });
 
     if (profileError) {
@@ -186,7 +192,7 @@ export async function POST(req: Request) {
 }
 
 // PUT /api/v1/superadmin
-// Updates subscription lifecycle states (trial, active, suspended) of a tenant.
+// Updates subscription lifecycle states or full client profile information.
 export async function PUT(req: Request) {
   try {
     const ctx = await getAuthContext();
@@ -194,27 +200,104 @@ export async function PUT(req: Request) {
     if (ctx.role !== 'superadmin') return err('Forbidden', 403);
 
     const body = await req.json();
-    const { tenantId, subscriptionStatus } = body;
+    const { 
+      tenantId, 
+      subscriptionStatus, 
+      tenantName, 
+      address, 
+      country, 
+      state, 
+      city, 
+      firstName, 
+      lastName, 
+      phone, 
+      alternatePhone,
+      clientEmail
+    } = body;
 
-    if (!tenantId || !subscriptionStatus) {
-      return err('Tenant ID and subscription state status are required.', 422);
+    if (!tenantId) {
+      return err('Tenant ID is required.', 422);
     }
 
     const db = adminDb();
 
-    const { data: updatedTenant, error: updateErr } = await db
-      .from('tenants')
-      .update({
-        subscription_status: subscriptionStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', tenantId)
-      .select()
-      .single();
+    // Case 1: Full Client Profile Update (includes Name, Address, Location, Admin Name & Phone)
+    if (tenantName) {
+      if (!firstName || !lastName || !phone) {
+        return err('Missing required fields for client profile update.', 422);
+      }
 
-    if (updateErr) throw updateErr;
+      // 1. Update the Tenant Details
+      const { data: updatedTenant, error: updateTenantErr } = await db
+        .from('tenants')
+        .update({
+          name: tenantName,
+          address: address || null,
+          country: country || 'India',
+          state: state || 'Telangana',
+          city: city || 'Hyderabad',
+          email: clientEmail || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tenantId)
+        .select()
+        .single();
 
-    return ok({ tenant: updatedTenant });
+      if (updateTenantErr) throw updateTenantErr;
+
+      // 2. Fetch the linked admin user for this tenant
+      const { data: adminUser, error: findAdminErr } = await db
+        .from('users')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('role', 'admin')
+        .single();
+
+      if (!findAdminErr && adminUser) {
+        // 3. Update Admin user public profile details
+        const { error: updateAdminErr } = await db
+          .from('users')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone || null,
+            alternate_phone: alternatePhone || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', adminUser.id);
+
+        if (updateAdminErr) throw updateAdminErr;
+
+        // 4. Sync name updates to Supabase Auth metadata
+        await db.auth.admin.updateUserById(adminUser.id, {
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName
+          }
+        });
+      }
+
+      return ok({ tenant: updatedTenant });
+    }
+
+    // Case 2: Subscription Status Update Only
+    if (subscriptionStatus) {
+      const { data: updatedTenant, error: updateErr } = await db
+        .from('tenants')
+        .update({
+          subscription_status: subscriptionStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tenantId)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+
+      return ok({ tenant: updatedTenant });
+    }
+
+    return err('No update actions provided.', 400);
   } catch (e: unknown) {
     return err(e instanceof Error ? e.message : 'Internal server error', 500);
   }

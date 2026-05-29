@@ -22,6 +22,7 @@ export type Database = {
           domain: string | null;
           subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled';
           logo_url: string | null;
+          email: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -32,6 +33,7 @@ export type Database = {
           domain?: string | null;
           subscription_status?: 'trial' | 'active' | 'suspended' | 'cancelled';
           logo_url?: string | null;
+          email?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -47,6 +49,7 @@ export type Database = {
           first_name: string;
           last_name: string;
           phone: string | null;
+          alternate_phone: string | null;
           avatar_url: string | null;
           is_active: boolean;
           expo_push_token: string | null;
@@ -61,6 +64,7 @@ export type Database = {
           first_name: string;
           last_name: string;
           phone?: string | null;
+          alternate_phone?: string | null;
           avatar_url?: string | null;
           is_active?: boolean;
           expo_push_token?: string | null;

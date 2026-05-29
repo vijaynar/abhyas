@@ -6,6 +6,8 @@
    them at runtime so every component inherits the change.
    ════════════════════════════════════════════════════════════ */
 :root {
+  color-scheme: dark;
+  
   /* ── Canvas ── */
   --background:           #060814;
   --foreground:           #f1f5f9;
@@ -489,6 +491,32 @@ html, body {
   border-color: var(--primary);
   background: var(--glass-bg);
   box-shadow: 0 0 14px var(--primary-glow);
+}
+
+/* Fix date picker calendar icon visibility and styling globally */
+input[type="date"] {
+  color-scheme: dark;
+}
+[data-mode="light"] input[type="date"] {
+  color-scheme: light;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  filter: invert(1) !important; /* Force high-contrast white in dark mode */
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1 !important;
+  transform: scale(1.05) !important;
+}
+
+[data-mode="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none !important;
+  opacity: 0.6 !important;
 }
 
 /* ════════════════════════════════════════════════════════════
