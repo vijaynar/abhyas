@@ -46,6 +46,7 @@ export type Database = {
           tenant_id: string;
           email: string;
           role: 'superadmin' | 'admin' | 'student' | 'parent';
+          role_id?: string | null;
           first_name: string;
           last_name: string;
           phone: string | null;
@@ -61,6 +62,7 @@ export type Database = {
           tenant_id: string;
           email: string;
           role: 'superadmin' | 'admin' | 'student' | 'parent';
+          role_id?: string | null;
           first_name: string;
           last_name: string;
           phone?: string | null;
@@ -310,6 +312,74 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Omit<Database['public']['Tables']['fines']['Insert'], 'id' | 'tenant_id'>>;
+      };
+
+      permissions: {
+        Row: {
+          id: string;
+          module: string;
+          action: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          module: string;
+          action: string;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['permissions']['Insert']>;
+      };
+
+      roles: {
+        Row: {
+          id: string;
+          tenant_id: string | null;
+          name: string;
+          is_system: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id?: string | null;
+          name: string;
+          is_system?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['roles']['Insert']>;
+      };
+
+      role_permissions: {
+        Row: {
+          role_id: string;
+          permission_id: string;
+        };
+        Insert: {
+          role_id: string;
+          permission_id: string;
+        };
+        Update: never;
+      };
+
+      audit_logs: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          user_id: string | null;
+          action: string;
+          description: string;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          user_id?: string | null;
+          action: string;
+          description: string;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<Database['public']['Tables']['audit_logs']['Insert'], 'id' | 'tenant_id'>>;
       };
     };
 

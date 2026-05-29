@@ -9,12 +9,14 @@ import {
   Calendar,
   IndianRupee,
   FileText,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
   Moon,
   Palette,
   Settings,
+  Shield,
   Sparkles,
   Sun,
   User,
@@ -116,6 +118,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const adminItems = [
     ...(profile?.role === 'superadmin' ? [{ name: 'Academies', href: '/admin/superadmin', icon: ShieldAlert }] : []),
+    ...(isAdmin ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
+    ...(isAdmin ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
+    ...(isAdmin ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
     ...(isAdmin ? [{ name: 'Portal Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 

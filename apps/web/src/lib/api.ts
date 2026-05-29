@@ -101,3 +101,29 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 export function hasRole(ctx: AuthContext, ...roles: string[]): boolean {
   return roles.includes(ctx.role);
 }
+
+/**
+ * Write an operational audit log entry to public.audit_logs.
+ * Call this after any significant create/update/delete action.
+ */
+export async function logAuditEvent(
+  tenantId: string,
+  userId: string,
+  action: string,
+  description: string,
+  ipAddress?: string
+): Promise<void> {
+  try {
+    const db = adminDb();
+    await db.from('audit_logs').insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      action,
+      description,
+      ip_address: ipAddress ?? null,
+    });
+  } catch (e) {
+    // Audit logging must never crash the main operation
+    console.error('[AuditLog] Failed to write audit log:', e);
+  }
+}
