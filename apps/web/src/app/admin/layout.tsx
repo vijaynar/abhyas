@@ -96,22 +96,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isCoach = profile?.role === 'coach';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
-  const navItems = [
+  const topItems = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Attendance', href: '/admin/attendance', icon: FileText },
+    ...(isCoach ? [{ name: 'My Profile', href: '/admin/profile', icon: User }] : []),
+  ];
+
+  const manageItems = [
     { name: 'Classes', href: '/admin/classes', icon: BookOpen },
     { name: 'Batches', href: '/admin/batches', icon: Calendar },
-    { name: 'Students', href: '/admin/students', icon: Users },
     ...(isAdmin ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
-    { name: 'Attendance', href: '/admin/attendance', icon: FileText },
+    { name: 'Students', href: '/admin/students', icon: Users },
+  ];
+
+  const accountsItems = [
     { name: 'Fines & Payments', href: '/admin/fines', icon: IndianRupee },
     { name: 'Reports', href: '/admin/reports', icon: BarChart2 },
-    ...(isCoach ? [{ name: 'My Profile', href: '/admin/profile', icon: User }] : []),
+  ];
+
+  const adminItems = [
+    ...(profile?.role === 'superadmin' ? [{ name: 'Clients', href: '/admin/superadmin', icon: ShieldAlert }] : []),
     ...(isAdmin ? [{ name: 'Portal Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
-  if (profile?.role === 'superadmin') {
-    navItems.push({ name: 'Clients', href: '/admin/superadmin', icon: ShieldAlert });
-  }
+  const renderNavItem = (item: { name: string; href: string; icon: any }) => {
+    const Icon = item.icon;
+    const active = pathname === item.href;
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        onClick={() => setSidebarOpen(false)}
+        className={`flex items-center gap-3 px-4 h-10 rounded-xl text-sm font-medium transition-all duration-200 group
+        ${active 
+          ? 'bg-indigo-600 text-white font-semibold glow-indigo border border-indigo-500/30' 
+          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+      >
+        <Icon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${active ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+        {item.name}
+      </Link>
+    );
+  };
 
   if (loading) {
     return (
@@ -185,25 +210,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Sidebar Menu Links */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 h-10 rounded-xl text-sm font-medium transition-all duration-200 group
-                ${active 
-                  ? 'bg-indigo-600 text-white font-semibold glow-indigo border border-indigo-500/30' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-              >
-                <Icon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${active ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'}`} />
-                {item.name}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto no-scrollbar">
+          {/* Section 1: Dashboard */}
+          <div className="space-y-1">
+            {topItems.map((item) => renderNavItem(item))}
+          </div>
+
+          {/* Section 2: Manage */}
+          {manageItems.length > 0 && (
+            <div>
+              <div className="h-px bg-white/10 my-3" />
+              <div className="space-y-1">
+                <span className="px-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">
+                  Manage
+                </span>
+                {manageItems.map((item) => renderNavItem(item))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Accounts */}
+          {accountsItems.length > 0 && (
+            <div>
+              <div className="h-px bg-white/10 my-3" />
+              <div className="space-y-1">
+                <span className="px-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">
+                  Accounts
+                </span>
+                {accountsItems.map((item) => renderNavItem(item))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Administration */}
+          {adminItems.length > 0 && (
+            <div>
+              <div className="h-px bg-white/10 my-3" />
+              <div className="space-y-1">
+                <span className="px-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">
+                  Administration
+                </span>
+                {adminItems.map((item) => renderNavItem(item))}
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Sidebar Bottom Profile & Logout Footer */}
