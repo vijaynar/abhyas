@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     if (ctx.role !== 'superadmin') return err('Forbidden', 403);
 
     const body = await req.json();
-    const { email, password, firstName, lastName, phone, alternatePhone, tenantName, tenantSlug, subscriptionStatus, country, state, city, address, clientEmail } = body;
+    const { email, password, firstName, lastName, phone, alternatePhone, tenantName, tenantSlug, subscriptionStatus, country, state, city, address, academyEmail } = body;
 
     if (!email || !password || !firstName || !lastName || !tenantName || !tenantSlug || !phone) {
       return err('Missing required onboarding fields.', 422);
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
         state: state || 'Telangana',
         city: city || 'Hyderabad',
         address: address || null,
-        email: clientEmail || null
+        email: academyEmail || null
       })
       .select()
       .single();
@@ -192,7 +192,7 @@ export async function POST(req: Request) {
 }
 
 // PUT /api/v1/superadmin
-// Updates subscription lifecycle states or full client profile information.
+// Updates subscription lifecycle states or full academy profile information.
 export async function PUT(req: Request) {
   try {
     const ctx = await getAuthContext();
@@ -212,7 +212,7 @@ export async function PUT(req: Request) {
       lastName, 
       phone, 
       alternatePhone,
-      clientEmail
+      academyEmail
     } = body;
 
     if (!tenantId) {
@@ -221,10 +221,10 @@ export async function PUT(req: Request) {
 
     const db = adminDb();
 
-    // Case 1: Full Client Profile Update (includes Name, Address, Location, Admin Name & Phone)
+    // Case 1: Full Academy Profile Update (includes Name, Address, Location, Admin Name & Phone)
     if (tenantName) {
       if (!firstName || !lastName || !phone) {
-        return err('Missing required fields for client profile update.', 422);
+        return err('Missing required fields for academy profile update.', 422);
       }
 
       // 1. Update the Tenant Details
@@ -236,7 +236,7 @@ export async function PUT(req: Request) {
           country: country || 'India',
           state: state || 'Telangana',
           city: city || 'Hyderabad',
-          email: clientEmail || null,
+          email: academyEmail || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', tenantId)

@@ -73,7 +73,7 @@ export default function SuperadminPage() {
   const [state, setState] = useState('Telangana');
   const [city, setCity] = useState('Hyderabad');
   const [address, setAddress] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
+  const [academyEmail, setAcademyEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -82,14 +82,14 @@ export default function SuperadminPage() {
   const [password, setPassword] = useState('');
   const [subStatus, setSubStatus] = useState<'trial' | 'active'>('trial');
 
-  // Client Edit Modal State
+  // Academy Edit Modal State
   const [editingTenant, setEditingTenant] = useState<TenantItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editCountry, setEditCountry] = useState('India');
   const [editState, setEditState] = useState('Telangana');
   const [editCity, setEditCity] = useState('Hyderabad');
-  const [editClientEmail, setEditClientEmail] = useState('');
+  const [editAcademyEmail, setEditAcademyEmail] = useState('');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [editPrimaryPhone, setEditPrimaryPhone] = useState('');
@@ -160,9 +160,9 @@ export default function SuperadminPage() {
       return;
     }
 
-    // 2. Client Business Email (Optional)
-    if (clientEmail.trim() && !emailRegex.test(clientEmail.trim())) {
-      setErrorMsg('Invalid Client Business email address format.');
+    // 2. Academy Business Email (Optional)
+    if (academyEmail.trim() && !emailRegex.test(academyEmail.trim())) {
+      setErrorMsg('Invalid Academy Business email address format.');
       setSubmitting(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -206,7 +206,7 @@ export default function SuperadminPage() {
           state,
           city,
           address: address || null,
-          clientEmail: clientEmail || null
+          academyEmail: academyEmail || null
         })
       });
 
@@ -224,7 +224,7 @@ export default function SuperadminPage() {
       setState('Telangana');
       setCity('Hyderabad');
       setAddress('');
-      setClientEmail('');
+      setAcademyEmail('');
       setFirstName('');
       setLastName('');
       setEmail('');
@@ -287,7 +287,7 @@ export default function SuperadminPage() {
     setEditCountry(tenant.country || 'India');
     setEditState(tenant.state || 'Telangana');
     setEditCity(tenant.city || 'Hyderabad');
-    setEditClientEmail(tenant.email || '');
+    setEditAcademyEmail(tenant.email || '');
     setEditFirstName(tenant.admin?.firstName || '');
     setEditLastName(tenant.admin?.lastName || '');
     setEditPrimaryPhone(tenant.admin?.primaryPhone || '');
@@ -308,9 +308,9 @@ export default function SuperadminPage() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^\+?[0-9]{10,15}$/;
 
-    // 1. Client Business Email (Optional)
-    if (editClientEmail.trim() && !emailRegex.test(editClientEmail.trim())) {
-      setModalErrorMsg('Invalid Client Business email address format.');
+    // 1. Academy Business Email (Optional)
+    if (editAcademyEmail.trim() && !emailRegex.test(editAcademyEmail.trim())) {
+      setModalErrorMsg('Invalid Academy Business email address format.');
       setUpdatingTenant(false);
       return;
     }
@@ -344,7 +344,7 @@ export default function SuperadminPage() {
           country: editCountry,
           state: editState,
           city: editCity,
-          clientEmail: editClientEmail || null,
+          academyEmail: editAcademyEmail || null,
           firstName: editFirstName,
           lastName: editLastName,
           phone: editPrimaryPhone,
@@ -354,7 +354,7 @@ export default function SuperadminPage() {
 
       const result = await res.json();
       if (!res.ok) {
-        throw new Error(result.error || 'Failed to update client information.');
+        throw new Error(result.error || 'Failed to update academy information.');
       }
 
       setSuccessMsg(`Successfully updated profile for "${editName}"!`);
@@ -393,10 +393,10 @@ export default function SuperadminPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-            <ShieldAlert className="w-4 h-4" /> Client Management Console
+            <ShieldAlert className="w-4 h-4" /> Academy Management Console
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Client Management
+            Academy Management
           </h1>
         </div>
         <button
@@ -442,7 +442,7 @@ export default function SuperadminPage() {
           ${activeTab === 'provision' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
         >
           <span className="flex items-center gap-1.5">
-            <Plus className="w-4 h-4" /> Onboard Client
+            <Plus className="w-4 h-4" /> Onboard Academy
           </span>
           {activeTab === 'provision' && (
             <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-full glow-indigo" />
@@ -468,21 +468,22 @@ export default function SuperadminPage() {
         <div className="space-y-8">
           {/* KPI Dashboard Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-            {/* KPI 1: Total Clients */}
+            {/* KPI 1: Total Academies */}
             <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-indigo-500/5 blur-2xl" />
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Clients</span>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Academies</span>
                 <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
                   <Building2 className="w-3.5 h-3.5" />
                 </div>
               </div>
               <div className="mt-4">
                 <span className="text-3xl font-black text-white">{stats.totalTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Clients onboarded</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Academies onboarded</span>
               </div>
             </div>
 
+            {/* ... rest unchanged KPI cards ... */}
             {/* KPI 2: Active Subscriptions */}
             <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-emerald-500/5 blur-2xl" />
@@ -524,7 +525,7 @@ export default function SuperadminPage() {
               </div>
               <div className="mt-4">
                 <span className="text-3xl font-black text-white text-red-400">{stats.suspendedTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Locked out clients</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Locked out academies</span>
               </div>
             </div>
 
@@ -550,8 +551,8 @@ export default function SuperadminPage() {
               <div className="p-6 border-b border-white/10 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-white tracking-tight">Onboarded Client Registry</h2>
-                    <p className="text-[10px] text-slate-400">Search, monitor, and regulate active client subscriptions</p>
+                    <h2 className="text-lg font-bold text-white tracking-tight">Onboarded Academies</h2>
+                    <p className="text-[10px] text-slate-400">Search, monitor, and regulate active academy subscriptions</p>
                   </div>
 
                   {/* Search Bar */}
@@ -623,18 +624,18 @@ export default function SuperadminPage() {
               {loading ? (
                 <div className="p-12 text-center text-slate-500">
                   <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-[10px] uppercase font-bold tracking-wider">Loading Client registries...</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider">Loading Academy registries...</p>
                 </div>
               ) : filteredTenants.length === 0 ? (
                 <div className="p-12 text-center text-slate-500">
                   <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                  <p className="text-xs">No active clients match your query.</p>
+                  <p className="text-xs">No active academies match your query.</p>
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-white/10 bg-white/[0.01] text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
-                      <th className="py-3.5 px-4 min-w-[160px]">Client Name</th>
+                      <th className="py-3.5 px-4 min-w-[160px]">Academy Name</th>
                       <th className="py-3.5 px-4 min-w-[100px]">URL Slug</th>
                       <th className="py-3.5 px-4 min-w-[130px]">Location</th>
                       <th className="py-3.5 px-4 min-w-[185px]">Administrative Owner</th>
@@ -729,25 +730,25 @@ export default function SuperadminPage() {
           <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
           
           <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-indigo-400 text-[10px] font-bold tracking-wider uppercase mb-3 w-fit glow-indigo">
-            <Sparkles className="w-3.5 h-3.5" /> Direct Client Provisioning
+            <Sparkles className="w-3.5 h-3.5" /> Direct Academy Provisioning
           </div>
           
-          <h2 className="text-xl font-black text-white tracking-tight">Onboard New Client</h2>
+          <h2 className="text-xl font-black text-white tracking-tight">Onboard New Academy</h2>
           <p className="text-xs text-slate-400 leading-normal mb-6 mt-1">
-            Provision a new client profile along with its designated administrator.
+            Provision a new academy profile along with its designated administrator.
           </p>
 
           <form onSubmit={handleProvisionTenant} className="space-y-6">
             {/* Section 1: Tenant Information */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/5 pb-2">
-                1. Client Identity Profile
+                1. Academy Identity Profile
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1.5">
                   <label className="text-slate-400 text-[10px] font-extrabold uppercase tracking-wide block">
-                    Client Name
+                    Academy Name
                   </label>
                   <input
                     type="text"
@@ -775,12 +776,12 @@ export default function SuperadminPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-slate-400 text-[10px] font-extrabold uppercase tracking-wide block">
-                    Client Email ID (Optional)
+                    Academy Email ID (Optional)
                   </label>
                   <input
                     type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
+                    value={academyEmail}
+                    onChange={(e) => setAcademyEmail(e.target.value)}
                     placeholder="e.g. business@apexmartial.com"
                     className="w-full h-10 px-4 rounded-xl glass-input text-xs font-mono"
                   />
@@ -805,7 +806,7 @@ export default function SuperadminPage() {
             {/* Section 2: Location Profile */}
             <div className="space-y-4 pt-2">
               <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/5 pb-2">
-                2. Client Location Profile
+                2. Academy Location Profile
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -854,7 +855,7 @@ export default function SuperadminPage() {
 
               <div className="space-y-1.5">
                 <label className="text-slate-400 text-[10px] font-extrabold uppercase tracking-wide block">
-                  Client Physical Address (Optional)
+                  Academy Physical Address (Optional)
                 </label>
                 <input
                   type="text"
@@ -969,7 +970,7 @@ export default function SuperadminPage() {
               {submitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                'Onboard & Provision Client Profile'
+                'Onboard & Provision Academy Profile'
               )}
             </button>
           </form>
@@ -1094,18 +1095,18 @@ export default function SuperadminPage() {
             <h3 className="text-base font-black text-white uppercase tracking-wider mb-1 flex items-center gap-2">
               {isEditMode ? (
                 <>
-                  <Edit2 className="w-4.5 h-4.5 text-indigo-400" /> Edit Client Profile
+                  <Edit2 className="w-4.5 h-4.5 text-indigo-400" /> Edit Academy Profile
                 </>
               ) : (
                 <>
-                  <Building2 className="w-4.5 h-4.5 text-indigo-400" /> Client Profile Details
+                  <Building2 className="w-4.5 h-4.5 text-indigo-400" /> Academy Profile Details
                 </>
               )}
             </h3>
             <p className="text-[10px] text-slate-400 mb-6">
               {isEditMode 
-                ? 'Update Client profile parameters and primary administrator contact records.'
-                : 'Review Client registration, subscription status, and designated administrator details.'}
+                ? 'Update Academy profile parameters and primary administrator contact records.'
+                : 'Review Academy registration, subscription status, and designated administrator details.'}
             </p>
 
             {modalErrorMsg && (
@@ -1118,15 +1119,15 @@ export default function SuperadminPage() {
             {!isEditMode ? (
               /* ── STAGE 1: READ-ONLY VIEW MODE ── */
               <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1 no-scrollbar">
-                {/* Section 1: Client Identity & Location */}
+                {/* Section 1: Academy Identity & Location */}
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider border-b border-white/5 pb-2">
-                    1. Client Identity & Location
+                    1. Academy Identity & Location
                   </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
-                      <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider block">Client Name</span>
+                      <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider block">Academy Name</span>
                       <span className="text-xs font-bold text-slate-200 block mt-1">{editingTenant.name}</span>
                     </div>
 
@@ -1138,7 +1139,7 @@ export default function SuperadminPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
-                      <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider block">Client Business Email</span>
+                      <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider block">Academy Business Email</span>
                       <span className="text-xs font-mono text-slate-300 font-normal block mt-1 break-all select-all">
                         {editingTenant.email || 'No email registered'}
                       </span>
@@ -1199,7 +1200,7 @@ export default function SuperadminPage() {
                     </>
                   ) : (
                     <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-center text-slate-400 text-xs">
-                      No administrator is currently linked to this client.
+                      No administrator is currently linked to this academy.
                     </div>
                   )}
                 </div>
@@ -1224,7 +1225,7 @@ export default function SuperadminPage() {
                       className="h-9 px-5 rounded-xl btn-premium text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer glow-indigo"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
-                      Edit Client Profile
+                      Edit Academy Profile
                     </button>
                   </div>
                 </div>
@@ -1232,16 +1233,16 @@ export default function SuperadminPage() {
             ) : (
               /* ── STAGE 2: INTERACTIVE EDIT MODE ── */
               <form onSubmit={handleUpdateTenantProfile} className="space-y-6 max-h-[70vh] overflow-y-auto pr-1 no-scrollbar">
-                {/* Section 1: Client Information */}
+                {/* Section 1: Academy Information */}
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider border-b border-white/5 pb-2">
-                    1. Client Identity & Location
+                    1. Academy Identity & Location
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wide block">
-                        Client Name
+                        Academy Name
                       </label>
                       <input
                         type="text"
@@ -1267,12 +1268,12 @@ export default function SuperadminPage() {
 
                   <div className="space-y-1">
                     <label className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wide block">
-                      Client Email ID (Optional)
+                      Academy Email ID (Optional)
                     </label>
                     <input
                       type="email"
-                      value={editClientEmail}
-                      onChange={(e) => setEditClientEmail(e.target.value)}
+                      value={editAcademyEmail}
+                      onChange={(e) => setEditAcademyEmail(e.target.value)}
                       placeholder="e.g. business@apexmartial.com"
                       className="w-full h-9 px-3.5 rounded-xl glass-input text-xs font-mono text-indigo-300 font-semibold"
                     />
@@ -1321,7 +1322,7 @@ export default function SuperadminPage() {
 
                   <div className="space-y-1">
                     <label className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wide block">
-                      Client Physical Address (Optional)
+                      Academy Physical Address (Optional)
                     </label>
                     <input
                       type="text"
@@ -1423,7 +1424,7 @@ export default function SuperadminPage() {
                     {updatingTenant ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      'Save Client Changes'
+                      'Save Academy Changes'
                     )}
                   </button>
                 </div>

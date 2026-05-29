@@ -115,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   const adminItems = [
-    ...(profile?.role === 'superadmin' ? [{ name: 'Clients', href: '/admin/superadmin', icon: ShieldAlert }] : []),
+    ...(profile?.role === 'superadmin' ? [{ name: 'Academies', href: '/admin/superadmin', icon: ShieldAlert }] : []),
     ...(isAdmin ? [{ name: 'Portal Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
