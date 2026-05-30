@@ -28,6 +28,8 @@ interface RolePermission {
 const MODULES = [
   { key: 'students',   label: 'Students'   },
   { key: 'coaches',    label: 'Coaches'     },
+  { key: 'classes',    label: 'Classes'     },
+  { key: 'batches',    label: 'Batches'     },
   { key: 'attendance', label: 'Attendance'  },
   { key: 'payments',   label: 'Payments'    },
   { key: 'reports',    label: 'Reports'     },

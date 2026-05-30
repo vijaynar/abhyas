@@ -2,7 +2,7 @@
 // POST /api/v1/governance/roles  — Create custom role
 // PUT  /api/v1/governance/roles  — Update role permissions
 
-import { getAuthContext, adminDb, ok, err, created } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, created, logAuditEvent } from '@/lib/api';
 
 export async function GET(req: Request) {
   try {
@@ -36,10 +36,11 @@ export async function GET(req: Request) {
     if (rpErr) throw rpErr;
 
     // Count users per role
-    const { data: userRoleCounts, error: ucErr } = await db
-      .from('users')
-      .select('role_id')
-      .eq('tenant_id', ctx.tenantId);
+    let countQuery = db.from('users').select('role_id');
+    if (ctx.role !== 'superadmin') {
+      countQuery = countQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: userRoleCounts, error: ucErr } = await countQuery;
     if (ucErr) throw ucErr;
 
     const countMap: Record<string, number> = {};
@@ -102,6 +103,13 @@ export async function POST(req: Request) {
       }
     }
 
+    await logAuditEvent(
+      ctx.tenantId,
+      ctx.userId,
+      'roles.manage',
+      `Created custom role "${name}"`
+    );
+
     return created({ role });
   } catch (e: unknown) {
     return err(e instanceof Error ? e.message : 'Internal server error', 500);
@@ -151,6 +159,13 @@ export async function PUT(req: Request) {
       const { error: rpErr } = await db.from('role_permissions').insert(mappings);
       if (rpErr) throw rpErr;
     }
+
+    await logAuditEvent(
+      ctx.tenantId,
+      ctx.userId,
+      'roles.manage',
+      `Updated permissions for role "${role.name}": [${assignedPermissions.join(', ')}]`
+    );
 
     return ok({ roleId, updatedPermissions: assignedPermissions });
   } catch (e: unknown) {

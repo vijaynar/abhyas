@@ -2,7 +2,7 @@
 // Secure API endpoint for platform-wide SaaS administration.
 // Only accessible by users with the 'superadmin' role.
 
-import { getAuthContext, adminDb, ok, err, created } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, created, logAuditEvent } from '@/lib/api';
 
 // GET /api/v1/superadmin
 // Aggregates global system analytics and lists all tenant coaching centers.
@@ -133,7 +133,15 @@ export async function POST(req: Request) {
       throw tenantError;
     }
 
-    // 2. Create the Admin user in Supabase Auth
+    // 2. Fetch dynamic Admin role id to link primary owner
+    const { data: adminRole } = await db
+      .from('roles')
+      .select('id')
+      .eq('name', 'Admin')
+      .is('tenant_id', null)
+      .single();
+
+    // 3. Create the Admin user in Supabase Auth
     const { data: authData, error: authError } = await db.auth.admin.createUser({
       email,
       password,
@@ -159,7 +167,7 @@ export async function POST(req: Request) {
 
     const userId = authData.user.id;
 
-    // 3. Insert user profile in public.users
+    // 4. Insert user profile in public.users with mapped role_id
     const { error: profileError } = await db
       .from('users')
       .insert({
@@ -167,6 +175,7 @@ export async function POST(req: Request) {
         tenant_id: tenant.id,
         email,
         role: 'admin',
+        role_id: adminRole?.id || null,
         first_name: firstName,
         last_name: lastName,
         phone,
@@ -179,6 +188,14 @@ export async function POST(req: Request) {
       await db.from('tenants').delete().eq('id', tenant.id);
       throw profileError;
     }
+
+    // 5. Add operational audit log
+    await logAuditEvent(
+      tenant.id,
+      userId,
+      'portal.manage',
+      `Academy "${tenantName}" provisioned with primary admin / owner ${firstName} ${lastName} (${email})`
+    );
 
     return created({
       userId,

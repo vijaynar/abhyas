@@ -12,11 +12,18 @@ export async function GET(req: Request) {
     if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
 
     const db = adminDb();
-    const { data: users, error: usersErr } = await db
+    let query = db
       .from('users')
-      .select('id, email, first_name, last_name, role, role_id, phone, is_active, avatar_url, created_at, roles(name)')
-      .eq('tenant_id', ctx.tenantId)
+      .select('id, email, first_name, last_name, role, role_id, phone, is_active, avatar_url, created_at, roles(name), tenants(name)')
       .order('created_at', { ascending: false });
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    } else {
+      query = query.in('role', ['admin', 'superadmin']);
+    }
+
+    const { data: users, error: usersErr } = await query;
 
     if (usersErr) throw usersErr;
 

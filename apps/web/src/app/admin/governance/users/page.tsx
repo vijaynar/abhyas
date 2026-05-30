@@ -18,6 +18,7 @@ interface UserItem {
   avatar_url: string | null;
   created_at: string;
   roles?: { name: string } | null;
+  tenants?: { name: string } | null;
 }
 
 const ROLE_STYLES: Record<string, string> = {
@@ -197,6 +198,11 @@ export default function UserDirectoryPage() {
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-bold text-white truncate">{user.first_name} {user.last_name}</h4>
                             <p className="text-[10px] text-slate-500 font-mono truncate">{user.email}</p>
+                            {user.tenants?.name && (
+                              <div className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-wide mt-1 truncate bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md w-fit">
+                                {user.tenants.name}
+                              </div>
+                            )}
                           </div>
                           <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wide shrink-0 ${roleStyle}`}>
                             {roleDisplayName}
