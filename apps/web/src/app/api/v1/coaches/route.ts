@@ -23,7 +23,8 @@ export async function GET(req: Request) {
       .select(`
         id, email, first_name, last_name, phone, avatar_url, is_active, role,
         coach_profile:coaches(
-          expertise, availability_slots, hourly_rate, certificates, created_at
+          expertise, availability_slots, hourly_rate, monthly_rate, certificates,
+          country, state, city, area, offers_online, created_at
         ),
         batch_assignments:coach_batch_assignments!coach_batch_assignments_coach_id_fkey(
           id, status, batch_id,
@@ -100,7 +101,9 @@ export async function POST(req: Request) {
     if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
 
     const body = await req.json();
-    const { email, password, firstName, lastName, phone, expertise, availabilitySlots, hourlyRate, avatarUrl } = body;
+    const { email, password, firstName, lastName, phone, expertise, availabilitySlots,
+      hourlyRate, monthlyRate, avatarUrl,
+      country, state, city, area, offersOnline } = body;
 
     if (!email || !password || !firstName || !lastName) {
       return err('email, password, firstName, and lastName are required', 422);
@@ -152,7 +155,13 @@ export async function POST(req: Request) {
         expertise: expertise ?? null,
         availability_slots: availabilitySlots ?? null,
         hourly_rate: hourlyRate ?? 500,
+        monthly_rate: monthlyRate ?? null,
         certificates: [],
+        country: country ?? null,
+        state: state ?? null,
+        city: city ?? null,
+        area: area ?? null,
+        offers_online: offersOnline ?? false,
       })
       .select()
       .single();
@@ -215,7 +224,13 @@ export async function PUT(req: Request) {
     if (fields.expertise !== undefined) coachUpdate.expertise = fields.expertise;
     if (fields.availabilitySlots !== undefined) coachUpdate.availability_slots = fields.availabilitySlots;
     if (fields.hourlyRate !== undefined) coachUpdate.hourly_rate = fields.hourlyRate;
+    if (fields.monthlyRate !== undefined) coachUpdate.monthly_rate = fields.monthlyRate;
     if (fields.certificates !== undefined) coachUpdate.certificates = fields.certificates;
+    if (fields.country !== undefined) coachUpdate.country = fields.country;
+    if (fields.state !== undefined) coachUpdate.state = fields.state;
+    if (fields.city !== undefined) coachUpdate.city = fields.city;
+    if (fields.area !== undefined) coachUpdate.area = fields.area;
+    if (fields.offersOnline !== undefined) coachUpdate.offers_online = fields.offersOnline;
 
     if (Object.keys(coachUpdate).length > 0) {
       coachUpdate.updated_at = new Date().toISOString();

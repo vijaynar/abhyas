@@ -23,6 +23,9 @@ import {
   UserX,
   UserCheck,
   Calendar,
+  Globe,
+  MapPin,
+  Wifi,
 } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase';
 import CustomSelect from '../components/CustomSelect';
@@ -41,7 +44,13 @@ interface CoachItem {
     expertise: string | null;
     availability_slots: string | null;
     hourly_rate: number;
+    monthly_rate: number | null;
     certificates: string[];
+    country: string | null;
+    state: string | null;
+    city: string | null;
+    area: string | null;
+    offers_online: boolean;
   } | null;
   batch_assignments: {
     id: string;
@@ -232,6 +241,12 @@ export default function CoachesPage() {
     expertise: '',
     availability_slots: '',
     hourly_rate: 500,
+    monthly_rate: '' as string | number,
+    country: 'India',
+    state: '',
+    city: '',
+    area: '',
+    offers_online: false,
   });
   const [onboardPhoto, setOnboardPhoto] = useState<File | null>(null);
   const [onboardPhotoPreview, setOnboardPhotoPreview] = useState<string | null>(null);
@@ -243,6 +258,12 @@ export default function CoachesPage() {
     expertise: '',
     availability_slots: '',
     hourly_rate: 500,
+    monthly_rate: '' as string | number,
+    country: '',
+    state: '',
+    city: '',
+    area: '',
+    offers_online: false,
   });
   const [editCerts, setEditCerts] = useState<string[]>([]);
   const [certUploading, setCertUploading] = useState(false);
@@ -423,6 +444,12 @@ export default function CoachesPage() {
         expertise: onboardForm.expertise,
         availabilitySlots: onboardForm.availability_slots,
         hourlyRate: onboardForm.hourly_rate,
+        monthlyRate: onboardForm.monthly_rate !== '' ? Number(onboardForm.monthly_rate) : null,
+        country: onboardForm.country || null,
+        state: onboardForm.state || null,
+        city: onboardForm.city || null,
+        area: onboardForm.area || null,
+        offersOnline: onboardForm.offers_online,
       };
 
       // Upload avatar if provided
@@ -460,6 +487,12 @@ export default function CoachesPage() {
         expertise: '',
         availability_slots: '',
         hourly_rate: 500,
+        monthly_rate: '',
+        country: 'India',
+        state: '',
+        city: '',
+        area: '',
+        offers_online: false,
       });
       setOnboardPhoto(null);
       setOnboardPhotoPreview(null);
@@ -481,6 +514,12 @@ export default function CoachesPage() {
       expertise: coach.coach_profile?.expertise ?? '',
       availability_slots: coach.coach_profile?.availability_slots ?? '',
       hourly_rate: coach.coach_profile?.hourly_rate ?? 500,
+      monthly_rate: coach.coach_profile?.monthly_rate ?? '',
+      country: coach.coach_profile?.country ?? '',
+      state: coach.coach_profile?.state ?? '',
+      city: coach.coach_profile?.city ?? '',
+      area: coach.coach_profile?.area ?? '',
+      offers_online: coach.coach_profile?.offers_online ?? false,
     });
     setEditCerts(coach.coach_profile?.certificates ?? []);
     setShowEdit(true);
@@ -544,6 +583,12 @@ export default function CoachesPage() {
           expertise: editForm.expertise,
           availabilitySlots: editForm.availability_slots,
           hourlyRate: editForm.hourly_rate,
+          monthlyRate: editForm.monthly_rate !== '' ? Number(editForm.monthly_rate) : null,
+          country: editForm.country || null,
+          state: editForm.state || null,
+          city: editForm.city || null,
+          area: editForm.area || null,
+          offersOnline: editForm.offers_online,
           certificates: editCerts,
         }),
       });
@@ -908,12 +953,30 @@ export default function CoachesPage() {
                           )}
                         </td>
 
-                        {/* Hourly Rate */}
+                        {/* Rates */}
                         <td className="px-3 py-3 text-xs">
-                          <span className="text-emerald-400 font-semibold">
-                            ₹{(coach.coach_profile?.hourly_rate ?? 0).toLocaleString('en-IN')}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-emerald-400 font-semibold">
+                              ₹{(coach.coach_profile?.hourly_rate ?? 0).toLocaleString('en-IN')}<span className="text-slate-500 font-normal">/hr</span>
+                            </span>
+                            {coach.coach_profile?.monthly_rate != null && (
+                              <span className="text-violet-400 font-semibold">
+                                ₹{Number(coach.coach_profile.monthly_rate).toLocaleString('en-IN')}<span className="text-slate-500 font-normal">/mo</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                              <MapPin className="w-2.5 h-2.5" />In-person
+                            </span>
+                            {coach.coach_profile?.offers_online && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                <Wifi className="w-2.5 h-2.5" />Online
+                              </span>
+                            )}
+                          </div>
                         </td>
+
 
                         {/* Active Batches */}
                         <td className="px-3 py-3">
@@ -970,7 +1033,48 @@ export default function CoachesPage() {
                       {isExpanded && (
                         <tr key={`${coach.id}-expanded`} className="bg-indigo-500/[0.03]">
                           <td colSpan={8} className="px-8 py-5">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Service Location & Rates */}
+                            <div>
+                              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5" />
+                                Service Info
+                              </p>
+                              <div className="space-y-2">
+                                {/* Rates */}
+                                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                                  <span className="text-slate-500 text-[11px]">Hourly</span>
+                                  <span className="text-emerald-400 font-semibold text-xs">₹{(coach.coach_profile?.hourly_rate ?? 0).toLocaleString('en-IN')}/hr</span>
+                                </div>
+                                {coach.coach_profile?.monthly_rate != null && (
+                                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                                    <span className="text-slate-500 text-[11px]">Monthly</span>
+                                    <span className="text-violet-400 font-semibold text-xs">₹{Number(coach.coach_profile.monthly_rate).toLocaleString('en-IN')}/mo</span>
+                                  </div>
+                                )}
+                                {/* Delivery modes */}
+                                <div className="flex gap-1.5 pt-1">
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                                    <MapPin className="w-2.5 h-2.5" />In-person
+                                  </span>
+                                  {coach.coach_profile?.offers_online && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                                      <Wifi className="w-2.5 h-2.5" />Online
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Location */}
+                                {(coach.coach_profile?.city || coach.coach_profile?.state) && (
+                                  <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 mt-1">
+                                    <p className="text-[10px] text-slate-500 mb-0.5">Location</p>
+                                    <p className="text-slate-300 text-xs">
+                                      {[coach.coach_profile?.area, coach.coach_profile?.city, coach.coach_profile?.state, coach.coach_profile?.country].filter(Boolean).join(', ')}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
                               {/* Batch Assignments */}
                               <div>
                                 <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -1224,25 +1328,122 @@ export default function CoachesPage() {
                 />
               </div>
 
-              {/* Hourly Rate */}
+              {/* Rates row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                    Hourly Rate (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      value={onboardForm.hourly_rate}
+                      onChange={(e) =>
+                        setOnboardForm((f) => ({ ...f, hourly_rate: Number(e.target.value) }))
+                      }
+                      className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                    Monthly Rate (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      placeholder="Optional"
+                      value={onboardForm.monthly_rate}
+                      onChange={(e) =>
+                        setOnboardForm((f) => ({ ...f, monthly_rate: e.target.value }))
+                      }
+                      className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Delivery Mode */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  Hourly Rate (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={onboardForm.hourly_rate}
-                    onChange={(e) =>
-                      setOnboardForm((f) => ({ ...f, hourly_rate: Number(e.target.value) }))
-                    }
-                    className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
-                  />
+                <label className="block text-xs font-medium text-slate-400 mb-2">Service Delivery</label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 cursor-pointer hover:border-indigo-500/40 transition-colors">
+                    <div className="p-1.5 rounded-lg bg-indigo-500/10">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                    </div>
+                    <span className="text-sm text-slate-300 flex-1">In-person (physical location)</span>
+                    <span className="text-xs text-slate-500">Always enabled</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200
+                    hover:border-emerald-500/40
+                    " style={{ borderColor: onboardForm.offers_online ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.1)', background: onboardForm.offers_online ? 'rgba(52,211,153,0.05)' : 'transparent' }}>
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10">
+                      <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-sm text-slate-300 flex-1">Online services</span>
+                    <input
+                      type="checkbox"
+                      checked={onboardForm.offers_online}
+                      onChange={(e) => setOnboardForm((f) => ({ ...f, offers_online: e.target.checked }))}
+                      className="w-4 h-4 accent-emerald-400"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Physical Service Location */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-xs font-medium text-slate-400">Physical Service Location</label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Country</label>
+                    <input
+                      type="text"
+                      placeholder="India"
+                      value={onboardForm.country}
+                      onChange={(e) => setOnboardForm((f) => ({ ...f, country: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">State</label>
+                    <input
+                      type="text"
+                      placeholder="Maharashtra"
+                      value={onboardForm.state}
+                      onChange={(e) => setOnboardForm((f) => ({ ...f, state: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">City</label>
+                    <input
+                      type="text"
+                      placeholder="Mumbai"
+                      value={onboardForm.city}
+                      onChange={(e) => setOnboardForm((f) => ({ ...f, city: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Area / Locality</label>
+                    <input
+                      type="text"
+                      placeholder="Andheri West"
+                      value={onboardForm.area}
+                      onChange={(e) => setOnboardForm((f) => ({ ...f, area: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1381,25 +1582,97 @@ export default function CoachesPage() {
                 />
               </div>
 
-              {/* Hourly Rate */}
+              {/* Rates row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Hourly Rate (₹)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      value={editForm.hourly_rate}
+                      onChange={(e) => setEditForm((f) => ({ ...f, hourly_rate: Number(e.target.value) }))}
+                      className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Monthly Rate (₹)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      placeholder="Optional"
+                      value={editForm.monthly_rate}
+                      onChange={(e) => setEditForm((f) => ({ ...f, monthly_rate: e.target.value }))}
+                      className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Delivery Mode */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  Hourly Rate (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={editForm.hourly_rate}
-                    onChange={(e) =>
-                      setEditForm((f) => ({ ...f, hourly_rate: Number(e.target.value) }))
-                    }
-                    className="glass-input rounded-xl pl-7 pr-3 py-2 text-sm w-full"
-                  />
+                <label className="block text-xs font-medium text-slate-400 mb-2">Service Delivery</label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 cursor-pointer hover:border-indigo-500/40 transition-colors">
+                    <div className="p-1.5 rounded-lg bg-indigo-500/10">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                    </div>
+                    <span className="text-sm text-slate-300 flex-1">In-person (physical location)</span>
+                    <span className="text-xs text-slate-500">Always enabled</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 hover:border-emerald-500/40"
+                    style={{ borderColor: editForm.offers_online ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.1)', background: editForm.offers_online ? 'rgba(52,211,153,0.05)' : 'transparent' }}>
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10">
+                      <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-sm text-slate-300 flex-1">Online services</span>
+                    <input
+                      type="checkbox"
+                      checked={editForm.offers_online}
+                      onChange={(e) => setEditForm((f) => ({ ...f, offers_online: e.target.checked }))}
+                      className="w-4 h-4 accent-emerald-400"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Physical Service Location */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-xs font-medium text-slate-400">Physical Service Location</label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Country</label>
+                    <input type="text" placeholder="India" value={editForm.country}
+                      onChange={(e) => setEditForm((f) => ({ ...f, country: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">State</label>
+                    <input type="text" placeholder="Maharashtra" value={editForm.state}
+                      onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">City</label>
+                    <input type="text" placeholder="Mumbai" value={editForm.city}
+                      onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Area / Locality</label>
+                    <input type="text" placeholder="Andheri West" value={editForm.area}
+                      onChange={(e) => setEditForm((f) => ({ ...f, area: e.target.value }))}
+                      className="glass-input rounded-xl px-3 py-2 text-sm w-full" />
+                  </div>
                 </div>
               </div>
 
