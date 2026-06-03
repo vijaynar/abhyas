@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       .select(`
         id, status, assigned_days, created_at,
         coach:coach_id(id, first_name, last_name, email, phone, avatar_url,
-          coach_profile:coaches(expertise, availability_slots, hourly_rate)
+          coach_profile:coaches(expertise:primary_skill)
         ),
         batch:batch_id(id, name, start_time, end_time, days_of_week,
           class:classes(name)
@@ -61,8 +61,8 @@ export async function POST(req: Request) {
 
     // Validate assignedDays if provided
     if (assignedDays !== undefined && assignedDays !== null) {
-      if (!Array.isArray(assignedDays) || assignedDays.some((d: unknown) => typeof d !== 'number' || d < 0 || d > 6)) {
-        return err('assignedDays must be an array of integers 0-6 (Sun=0 … Sat=6)', 422);
+      if (!Array.isArray(assignedDays) || assignedDays.some((d: unknown) => typeof d !== 'number' || d < 1 || d > 7)) {
+        return err('assignedDays must be an array of integers 1-7 (Mon=1 … Sun=7)', 422);
       }
     }
 
@@ -114,8 +114,8 @@ export async function PUT(req: Request) {
 
     // Validate assignedDays if provided
     if (assignedDays !== undefined && assignedDays !== null) {
-      if (!Array.isArray(assignedDays) || assignedDays.some((d: unknown) => typeof d !== 'number' || d < 0 || d > 6)) {
-        return err('assignedDays must be an array of integers 0-6 (Sun=0 … Sat=6)', 422);
+      if (!Array.isArray(assignedDays) || assignedDays.some((d: unknown) => typeof d !== 'number' || d < 1 || d > 7)) {
+        return err('assignedDays must be an array of integers 1-7 (Mon=1 … Sun=7)', 422);
       }
     }
 

@@ -193,7 +193,7 @@ export default function CoachProfilePage() {
             .single(),
           supabase
             .from('coaches')
-            .select('expertise, availability_slots, hourly_rate, certificates')
+            .select('expertise:primary_skill, experience_years')
             .eq('id', userId)
             .single(),
           supabase
@@ -208,7 +208,7 @@ export default function CoachProfilePage() {
         }
 
         if (coachRes.data) {
-          const cd = coachRes.data as CoachProfile;
+          const cd = coachRes.data as unknown as CoachProfile;
           setCoach(cd);
           setExpertise(cd.expertise ?? '');
           setAvailabilitySlots(cd.availability_slots ?? '');
@@ -282,6 +282,7 @@ export default function CoachProfilePage() {
         body: JSON.stringify({
           coachId: user.id,
           expertise,
+          primarySkill: expertise,
           availabilitySlots,
           hourlyRate: hourlyRate !== '' ? Number(hourlyRate) : null,
         }),

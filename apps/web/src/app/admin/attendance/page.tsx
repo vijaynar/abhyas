@@ -60,6 +60,8 @@ export default function AttendanceLogsPage() {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [userRole, setUserRole] = useState<string>('');
+  const [restrictionError, setRestrictionError] = useState<string | null>(null);
 
   const batchOptions = batches.map((b) => ({
     value: b.id,
@@ -85,17 +87,32 @@ export default function AttendanceLogsPage() {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       if (!profile) return;
+      setUserRole(profile.role ?? '');
 
-      const { data: batchData } = await supabase
-        .from('batches')
-        .select('id, name, classes(name)')
-        .eq('tenant_id', profile.tenant_id)
-        .order('name', { ascending: true });
+      let batchData;
+      if (profile.role === 'coach') {
+        const { data: assigned } = await supabase
+          .from('coach_batch_assignments')
+          .select('batch_id, batches(id, name, classes(name))')
+          .eq('coach_id', user.id)
+          .eq('status', 'approved');
+        
+        batchData = (assigned || [])
+          .map((a: any) => a.batches)
+          .filter(Boolean);
+      } else {
+        const { data } = await supabase
+          .from('batches')
+          .select('id, name, classes(name)')
+          .eq('tenant_id', profile.tenant_id)
+          .order('name', { ascending: true });
+        batchData = data || [];
+      }
 
       const loadedBatches = (batchData || []) as unknown as BatchItem[];
       setBatches(loadedBatches);
@@ -111,6 +128,7 @@ export default function AttendanceLogsPage() {
     if (!selectedBatch) return;
     if (isRef) setRefreshing(true);
     else setLoading(true);
+    setRestrictionError(null);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -118,12 +136,54 @@ export default function AttendanceLogsPage() {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       if (!profile) return;
       const tenantId = profile.tenant_id;
+      const role = profile.role ?? '';
+
+      if (role === 'coach') {
+        const { data: assignment, error: assignErr } = await supabase
+          .from('coach_batch_assignments')
+          .select('created_at, assigned_days, batch:batch_id(days_of_week)')
+          .eq('coach_id', user.id)
+          .eq('batch_id', selectedBatch)
+          .eq('status', 'approved')
+          .single();
+
+        if (assignErr || !assignment) {
+          setRestrictionError('You do not have an approved assignment for this batch.');
+          setLogs([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+
+        const assignDateStr = new Date(assignment.created_at).toISOString().split('T')[0];
+        if (selectedDate < assignDateStr) {
+          setRestrictionError(`Attendance logs before your assignment date (${new Date(assignment.created_at).toLocaleDateString()}) are not accessible.`);
+          setLogs([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+
+        const batchDays = (assignment.batch as any)?.days_of_week ?? [];
+        const coachDays = assignment.assigned_days ?? batchDays;
+
+        const jsDay = new Date(selectedDate).getDay();
+        const selectedDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+        if (!coachDays.includes(selectedDayOfWeek)) {
+          setRestrictionError('You are not assigned to manage attendance on this day of the week.');
+          setLogs([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      }
 
       // 1. Get all students assigned to this batch
       const { data: studentsData, error: stuErr } = await supabase
@@ -386,6 +446,13 @@ export default function AttendanceLogsPage() {
                   <td colSpan={7} className="py-12 text-center">
                     <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo mx-auto mb-3" />
                     <p className="text-xs text-slate-400">Loading daily attendance sheet...</p>
+                  </td>
+                </tr>
+              ) : restrictionError ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-amber-500 bg-amber-500/5">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" />
+                    <p className="text-xs font-semibold">{restrictionError}</p>
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (

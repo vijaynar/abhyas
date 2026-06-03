@@ -30,8 +30,8 @@ interface CoachStat {
   is_active: boolean;
   coach_profile: {
     expertise: string | null;
-    availability_slots: string | null;
-    hourly_rate: number;
+    availability_slots?: string | null;
+    hourly_rate?: number;
   } | null;
   approvedBatchCount: number;
   estimatedEarnings: number;
@@ -212,7 +212,7 @@ export default function AdminDashboard() {
           .from('users')
           .select(`
             id, first_name, last_name, avatar_url, is_active,
-            coach_profile:coaches(expertise, availability_slots, hourly_rate),
+            coach_profile:coaches(expertise:primary_skill),
             batch_assignments:coach_batch_assignments!coach_batch_assignments_coach_id_fkey(id, status, batch_id)
           `)
           .eq('tenant_id', tenantId)

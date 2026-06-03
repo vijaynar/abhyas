@@ -38,6 +38,7 @@ interface BatchItem {
 interface StudentItem {
   id: string;
   student_custom_id: string;
+  batch_id: string;
   users: {
     first_name: string;
     last_name: string;
@@ -68,6 +69,11 @@ export default function AdminReportsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'perfect_attendance' | 'has_absences' | 'has_fines' | 'no_fines'>('all');
 
+  // Role/coach settings
+  const [userRole, setUserRole] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [assignmentDate, setAssignmentDate] = useState<string | null>(null);
+
   // Date selection states
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // 0-indexed
@@ -97,28 +103,77 @@ export default function AdminReportsPage() {
   const loadMetadata = async () => {
     setLoading(true);
     try {
+      // 0. Get current user profile
+      const { data: { user } } = await supabase.auth.getUser();
+      let role = '';
+      let userId = '';
+      if (user) {
+        userId = user.id;
+        setCurrentUserId(user.id);
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          role = profile.role ?? '';
+          setUserRole(role);
+        }
+      }
+
       // 1. Fetch batches
-      const { data: batchData } = await supabase
-        .from('batches')
-        .select('id, name, classes(name)')
-        .order('name', { ascending: true });
+      let compiledBatches: BatchItem[] = [];
+      if (role === 'coach') {
+        const { data: assigned } = await supabase
+          .from('coach_batch_assignments')
+          .select('batch_id, batches(id, name, classes(name))')
+          .eq('coach_id', userId)
+          .eq('status', 'approved');
+        
+        const batchData = (assigned || [])
+          .map((a: any) => a.batches)
+          .filter(Boolean);
+        compiledBatches = batchData as unknown as BatchItem[];
+      } else {
+        const { data: batchData } = await supabase
+          .from('batches')
+          .select('id, name, classes(name)')
+          .order('name', { ascending: true });
+        compiledBatches = (batchData || []) as unknown as BatchItem[];
+      }
       
-      const compiledBatches = (batchData || []) as unknown as BatchItem[];
       setBatches(compiledBatches);
       if (compiledBatches.length > 0) {
         setSelectedBatch(compiledBatches[0].id);
+      } else {
+        setSelectedBatch('');
       }
 
       // 2. Fetch all students for the dropdown (Individual student tab)
-      const { data: studentsData } = await supabase
-        .from('students')
-        .select('id, student_custom_id, users(first_name, last_name)')
-        .order('student_custom_id', { ascending: true });
+      let compiledStudents: StudentItem[] = [];
+      if (role === 'coach') {
+        const assignedBatchIds = compiledBatches.map(b => b.id);
+        if (assignedBatchIds.length > 0) {
+          const { data: studentsData } = await supabase
+            .from('students')
+            .select('id, student_custom_id, batch_id, users(first_name, last_name)')
+            .in('batch_id', assignedBatchIds)
+            .order('student_custom_id', { ascending: true });
+          compiledStudents = (studentsData || []) as unknown as StudentItem[];
+        }
+      } else {
+        const { data: studentsData } = await supabase
+          .from('students')
+          .select('id, student_custom_id, batch_id, users(first_name, last_name)')
+          .order('student_custom_id', { ascending: true });
+        compiledStudents = (studentsData || []) as unknown as StudentItem[];
+      }
       
-      const compiledStudents = (studentsData || []) as unknown as StudentItem[];
       setAllStudents(compiledStudents);
       if (compiledStudents.length > 0) {
         setSelectedStudent(compiledStudents[0].id);
+      } else {
+        setSelectedStudent('');
       }
 
       // 3. Fetch Tenant Settings for Weekend and Holidays
@@ -154,10 +209,26 @@ export default function AdminReportsPage() {
     if (!selectedBatch) return;
     setLoadingReport(true);
     try {
+      // Get assignment date if coach
+      let assignDate: string | null = null;
+      if (userRole === 'coach' && currentUserId) {
+        const { data: assignment } = await supabase
+          .from('coach_batch_assignments')
+          .select('created_at')
+          .eq('coach_id', currentUserId)
+          .eq('batch_id', selectedBatch)
+          .eq('status', 'approved')
+          .single();
+        if (assignment) {
+          assignDate = new Date(assignment.created_at).toISOString().split('T')[0];
+        }
+      }
+      setAssignmentDate(assignDate);
+
       // 1. Fetch all students in that batch
       const { data: stus } = await supabase
         .from('students')
-        .select('id, student_custom_id, users(first_name, last_name)')
+        .select('id, student_custom_id, batch_id, users(first_name, last_name)')
         .eq('batch_id', selectedBatch)
         .order('student_custom_id', { ascending: true });
       
@@ -176,7 +247,11 @@ export default function AdminReportsPage() {
         .gte('date', startOfMonth)
         .lte('date', endOfMonth);
       
-      setAttendanceLogs((logs || []) as AttendanceRecord[]);
+      let filteredLogs = (logs || []) as AttendanceRecord[];
+      if (assignDate) {
+        filteredLogs = filteredLogs.filter(log => log.date >= assignDate);
+      }
+      setAttendanceLogs(filteredLogs);
 
       // 3. Fetch fines of the month
       const { data: fines } = await supabase
@@ -185,7 +260,14 @@ export default function AdminReportsPage() {
         .gte('issued_date', startOfMonth)
         .lte('issued_date', `${endOfMonth} 23:59:59`);
       
-      setFinesLogs((fines || []) as unknown as FineItem[]);
+      let filteredFines = (fines || []) as unknown as FineItem[];
+      if (assignDate) {
+        filteredFines = filteredFines.filter(f => {
+          const fineDateStr = new Date(f.issued_date).toISOString().split('T')[0];
+          return fineDateStr >= assignDate;
+        });
+      }
+      setFinesLogs(filteredFines);
 
     } catch (err) {
       console.error('Failed to load batch matrix report:', err);
@@ -198,6 +280,25 @@ export default function AdminReportsPage() {
     if (!selectedStudent) return;
     setLoadingReport(true);
     try {
+      const studentObj = allStudents.find(s => s.id === selectedStudent);
+      const studentBatchId = studentObj?.batch_id;
+
+      // Get assignment date if coach
+      let assignDate: string | null = null;
+      if (userRole === 'coach' && currentUserId && studentBatchId) {
+        const { data: assignment } = await supabase
+          .from('coach_batch_assignments')
+          .select('created_at')
+          .eq('coach_id', currentUserId)
+          .eq('batch_id', studentBatchId)
+          .eq('status', 'approved')
+          .single();
+        if (assignment) {
+          assignDate = new Date(assignment.created_at).toISOString().split('T')[0];
+        }
+      }
+      setAssignmentDate(assignDate);
+
       const startOfMonth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
       const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       const endOfMonth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
@@ -211,7 +312,12 @@ export default function AdminReportsPage() {
         .lte('date', endOfMonth);
 
       if (logsErr) throw logsErr;
-      setSingleStudentAttendance((logs || []) as AttendanceRecord[]);
+      
+      let filteredLogs = (logs || []) as AttendanceRecord[];
+      if (assignDate) {
+        filteredLogs = filteredLogs.filter(log => log.date >= assignDate);
+      }
+      setSingleStudentAttendance(filteredLogs);
 
       // 2. Fetch fines
       const { data: fines, error: finesErr } = await supabase
@@ -222,7 +328,15 @@ export default function AdminReportsPage() {
         .lte('issued_date', `${endOfMonth} 23:59:59`);
 
       if (finesErr) throw finesErr;
-      setSingleStudentFines((fines || []) as unknown as FineItem[]);
+      
+      let filteredFines = (fines || []) as unknown as FineItem[];
+      if (assignDate) {
+        filteredFines = filteredFines.filter(f => {
+          const fineDateStr = new Date(f.issued_date).toISOString().split('T')[0];
+          return fineDateStr >= assignDate;
+        });
+      }
+      setSingleStudentFines(filteredFines);
 
     } catch (err) {
       console.error('Failed to load individual student report:', err);
@@ -304,6 +418,11 @@ export default function AdminReportsPage() {
         const dStr = String(d).padStart(2, '0');
         const mStr = String(selectedMonth + 1).padStart(2, '0');
         const dateStr = `${selectedYear}-${mStr}-${dStr}`;
+
+        if (assignmentDate && dateStr < assignmentDate) {
+          row.push('N/A');
+          continue;
+        }
 
         const record = attendanceLogs.find(l => l.student_id === stu.id && l.date === dateStr);
         if (record) {
@@ -396,6 +515,10 @@ export default function AdminReportsPage() {
       const dStr = String(dayNum).padStart(2, '0');
       const mStr = String(selectedMonth + 1).padStart(2, '0');
       const dateStr = `${selectedYear}-${mStr}-${dStr}`;
+
+      if (assignmentDate && dateStr < assignmentDate) {
+        continue;
+      }
 
       const log = attendanceLogs.find(l => l.student_id === stu.id && l.date === dateStr);
       
@@ -508,13 +631,15 @@ export default function AdminReportsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 no-print">
         <div>
           <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-            <Sparkles className="w-4 h-4" /> Academy Intelligence
+            <Sparkles className="w-4 h-4" /> {userRole === 'coach' ? 'Student Intelligence' : 'Academy Intelligence'}
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Academy Reports
+            {userRole === 'coach' ? 'Student Reports' : 'Academy Reports'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Monthly attendance history, fine activity, and student progress insights for your academy.
+            {userRole === 'coach'
+              ? 'Monthly attendance history, fine activity, and progress insights for your students.'
+              : 'Monthly attendance history, fine activity, and student progress insights for your academy.'}
           </p>
         </div>
 
@@ -837,6 +962,14 @@ export default function AdminReportsPage() {
                                     const mStr = String(selectedMonth + 1).padStart(2, '0');
                                     const dateStr = `${selectedYear}-${mStr}-${dStr}`;
 
+                                    if (assignmentDate && dateStr < assignmentDate) {
+                                      return (
+                                        <td key={`cell-${dIdx}`} className="py-3 px-2 text-center border-r border-white/5 font-mono text-slate-600/40 font-normal">
+                                          N/A
+                                        </td>
+                                      );
+                                    }
+
                                     const log = attendanceLogs.find(l => l.student_id === stu.id && l.date === dateStr);
                                     
                                     let marker = '';
@@ -1057,7 +1190,11 @@ export default function AdminReportsPage() {
                             let textClass = 'text-slate-400';
                             let tag = '';
 
-                            if (isWkend || isHoli) {
+                            if (assignmentDate && dateStr < assignmentDate) {
+                              cellClass = 'bg-slate-900/40 border border-dashed border-white/5';
+                              textClass = 'text-slate-600';
+                              tag = 'N/A';
+                            } else if (isWkend || isHoli) {
                               cellClass = 'bg-slate-900/40 border border-dashed border-white/5';
                               textClass = 'text-slate-600';
                               tag = isHoli ? 'Holi' : 'Wkend';

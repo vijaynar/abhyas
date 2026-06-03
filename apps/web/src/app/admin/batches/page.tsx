@@ -30,6 +30,7 @@ interface BatchItem {
   classes: {
     name: string;
   };
+  students?: { id: string }[];
 }
 
 interface ClassOption {
@@ -49,8 +50,8 @@ interface CoachAssignment {
     avatar_url: string | null;
     coach_profile: {
       expertise: string | null;
-      availability_slots: string | null;
-      hourly_rate: number;
+      availability_slots?: string | null;
+      hourly_rate?: number;
     } | null;
   };
 }
@@ -63,8 +64,8 @@ interface AvailableCoach {
   avatar_url: string | null;
   coach_profile: {
     expertise: string | null;
-    availability_slots: string | null;
-    hourly_rate: number;
+    availability_slots?: string | null;
+    hourly_rate?: number;
   } | null;
 }
 
@@ -117,6 +118,7 @@ export default function BatchesPage() {
   const [assignLoading, setAssignLoading] = useState(false);
   // Day picker for coach assignment
   const [assignDaySelections, setAssignDaySelections] = useState<Set<number>>(new Set());
+  const [pendingDaySelections, setPendingDaySelections] = useState<Record<string, Set<number>>>({});
 
   // ── Batch form state ──────────────────────────────────────────────────────
   const [classId, setClassId] = useState('');
@@ -165,7 +167,7 @@ export default function BatchesPage() {
         .from('users')
         .select(
           `id, first_name, last_name, email, avatar_url,
-           coach_profile:coaches(expertise, availability_slots, hourly_rate)`,
+           coach_profile:coaches(expertise:primary_skill)`,
         )
         .eq('role', 'coach')
         .eq('is_active', true)
@@ -185,7 +187,7 @@ export default function BatchesPage() {
         .select(
           `id, batch_id, status, assigned_days,
            coach:coach_id(id, first_name, last_name, email, avatar_url,
-             coach_profile:coaches(expertise, availability_slots, hourly_rate))`,
+             coach_profile:coaches(expertise:primary_skill))`,
         )
         .in('batch_id', batchIds);
       if (error) throw error;
@@ -227,7 +229,7 @@ export default function BatchesPage() {
       const { data: batchData, error: batchErr } = await supabase
         .from('batches')
         .select(
-          'id, name, start_time, end_time, days_of_week, max_capacity, is_active, class_id, classes:class_id(name)',
+          'id, name, start_time, end_time, days_of_week, max_capacity, is_active, class_id, classes:class_id(name), students(id)',
         )
         .eq('tenant_id', tenantId)
         .order('start_time');
@@ -267,8 +269,16 @@ export default function BatchesPage() {
     if (managingBatch) {
       setAssignDaySelections(new Set(managingBatch.days_of_week ?? []));
       setSelectedCoachId('');
+
+      // Initialize pendingDaySelections for any pending assignments in this batch
+      const pendingList = (assignments[managingBatch.id] ?? []).filter(a => a.status === 'pending');
+      const selections: Record<string, Set<number>> = {};
+      for (const a of pendingList) {
+        selections[a.id] = new Set(a.assigned_days ?? managingBatch.days_of_week ?? []);
+      }
+      setPendingDaySelections(selections);
     }
-  }, [managingBatch?.id]);
+  }, [managingBatch?.id, assignments]);
 
   // ─── Success flash helper ──────────────────────────────────────────────────
 
@@ -410,11 +420,22 @@ export default function BatchesPage() {
 
   /** Approve a pending assignment */
   const handleApproveAssignment = async (assignmentId: string) => {
+    if (!managingBatch) return;
+    const batchDays = managingBatch.days_of_week ?? [];
+    const selections = pendingDaySelections[assignmentId] || new Set(batchDays);
+    const selectedArr = Array.from(selections).sort((a, b) => a - b);
+    const isAll = selectedArr.length === batchDays.length &&
+      batchDays.every(d => selectedArr.includes(d));
+
     try {
       const res = await fetch('/api/v1/coaches/assignments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId, status: 'approved' }),
+        body: JSON.stringify({
+          assignmentId,
+          status: 'approved',
+          assignedDays: isAll ? null : selectedArr
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadAssignments(batches.map((b) => b.id));
@@ -563,10 +584,11 @@ export default function BatchesPage() {
                 <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-300">
                   <th className="p-4 w-[15%] min-w-[120px]">Batch Name</th>
                   <th className="p-4 w-[15%] min-w-[130px]">Linked Course / Class</th>
-                  <th className="p-4 w-[15%] min-w-[120px]">Scheduled Hours</th>
-                  <th className="p-4 w-[20%] min-w-[160px]">Active Days</th>
-                  <th className="p-4 w-[10%] min-w-[90px]">Capacity</th>
-                  <th className="p-4 w-[10%] min-w-[80px]">Status</th>
+                  <th className="p-4 w-[12%] min-w-[120px]">Scheduled Hours</th>
+                  <th className="p-4 w-[18%] min-w-[160px]">Active Days</th>
+                  <th className="p-4 w-[10%] min-w-[90px]">Enrolled</th>
+                  <th className="p-4 w-[10%] min-w-[90px]">Max Capacity</th>
+                  <th className="p-4 w-[8%] min-w-[80px]">Status</th>
                   <th className="p-4 w-[15%] min-w-[160px]">Coaches</th>
                   <th className="p-4 text-right w-[10%] min-w-[80px]">Actions</th>
                 </tr>
@@ -602,6 +624,7 @@ export default function BatchesPage() {
                           ))}
                         </div>
                       </td>
+                      <td className="p-4 font-semibold text-indigo-400">{item.students?.length ?? 0} students</td>
                       <td className="p-4">{item.max_capacity} students</td>
                       <td className="p-4">
                         <span
@@ -660,31 +683,31 @@ export default function BatchesPage() {
 
                           {/* Coach self-status + request button */}
                           {isCoachRole && (
-                            <div className="mt-1">
-                              {myAssignment ? (
+                            <div className="mt-1 flex flex-col items-start gap-1">
+                              {myAssignment && myAssignment.status !== 'rejected' ? (
                                 <span
                                   className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
                                     myAssignment.status === 'approved'
                                       ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                      : myAssignment.status === 'pending'
-                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                                        : 'bg-red-500/10 border-red-500/20 text-red-400'
+                                      : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                                   }`}
                                 >
-                                  {myAssignment.status === 'approved'
-                                    ? '✓ Assigned'
-                                    : myAssignment.status === 'pending'
-                                      ? '⏳ Pending'
-                                      : '✕ Rejected'}
+                                  {myAssignment.status === 'approved' ? '✓ Assigned' : '⏳ Pending'}
                                 </span>
                               ) : (
-                                <button
-                                  onClick={() => handleRequestAssignment(item.id)}
-                                  disabled={alreadyAssigned}
-                                  className="btn-secondary h-6 px-2 rounded-lg text-[9px] font-bold cursor-pointer whitespace-nowrap"
-                                >
-                                  Request Assignment
-                                </button>
+                                <div className="flex flex-col items-start gap-1">
+                                  {myAssignment?.status === 'rejected' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-red-500/10 border-red-500/20 text-red-400">
+                                      ✕ Rejected
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => handleRequestAssignment(item.id)}
+                                    className="btn-secondary h-6 px-2 rounded-lg text-[9px] font-bold cursor-pointer whitespace-nowrap"
+                                  >
+                                    {myAssignment?.status === 'rejected' ? 'Request Again' : 'Request Assignment'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}
@@ -932,52 +955,89 @@ export default function BatchesPage() {
                         {pendingList.map((a) => (
                           <div
                             key={a.id}
-                            className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/10 rounded-xl p-3"
+                            className="flex flex-col gap-3 bg-amber-500/5 border border-amber-500/10 rounded-xl p-3"
                           >
-                            {/* Avatar */}
-                            <div className="w-8 h-8 rounded-full bg-amber-600/20 border border-amber-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {a.coach.avatar_url ? (
-                                <img
-                                  src={a.coach.avatar_url}
-                                  alt={a.coach.first_name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-[10px] font-bold text-amber-400">
-                                  {a.coach.first_name.charAt(0)}
-                                  {a.coach.last_name.charAt(0)}
-                                </span>
-                              )}
-                            </div>
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-slate-200 truncate">
-                                {a.coach.first_name} {a.coach.last_name}
-                              </p>
-                              <p className="text-[10px] text-slate-500 truncate">{a.coach.email}</p>
-                              {a.coach.coach_profile?.expertise && (
-                                <p className="text-[9px] text-indigo-400 mt-0.5 truncate">
-                                  {a.coach.coach_profile.expertise}
+                            <div className="flex items-center gap-3">
+                              {/* Avatar */}
+                              <div className="w-8 h-8 rounded-full bg-amber-600/20 border border-amber-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {a.coach.avatar_url ? (
+                                  <img
+                                    src={a.coach.avatar_url}
+                                    alt={a.coach.first_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] font-bold text-amber-400">
+                                    {a.coach.first_name.charAt(0)}
+                                    {a.coach.last_name.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-slate-200 truncate">
+                                  {a.coach.first_name} {a.coach.last_name}
                                 </p>
-                              )}
+                                <p className="text-[10px] text-slate-500 truncate">{a.coach.email}</p>
+                                {a.coach.coach_profile?.expertise && (
+                                  <p className="text-[9px] text-indigo-400 mt-0.5 truncate">
+                                    {a.coach.coach_profile.expertise}
+                                  </p>
+                                )}
+                              </div>
+                              {/* Actions */}
+                              <div className="flex gap-1.5 flex-shrink-0">
+                                <button
+                                  onClick={() => handleApproveAssignment(a.id)}
+                                  title="Approve"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleRejectAssignment(a.id)}
+                                  title="Reject"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
-                            {/* Actions */}
-                            <div className="flex gap-1.5 flex-shrink-0">
-                              <button
-                                onClick={() => handleApproveAssignment(a.id)}
-                                title="Approve"
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleRejectAssignment(a.id)}
-                                title="Reject"
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
+
+                            {/* Day picker for pending request */}
+                            {managingBatch.days_of_week.length > 0 && (
+                              <div className="flex flex-col gap-1.5 pt-1.5 border-t border-white/5">
+                                <p className="text-slate-500 text-[9px] font-semibold">Select Days for Assignment:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {managingBatch.days_of_week.map((d) => {
+                                    const selections = pendingDaySelections[a.id] || new Set(managingBatch.days_of_week);
+                                    const isOn = selections.has(d);
+                                    return (
+                                      <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => {
+                                          setPendingDaySelections(prev => {
+                                            const next = { ...prev };
+                                            const set = new Set(next[a.id] || managingBatch.days_of_week);
+                                            if (set.has(d)) set.delete(d); else set.add(d);
+                                            next[a.id] = set;
+                                            return next;
+                                          });
+                                        }}
+                                        className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                                          isOn
+                                            ? 'bg-indigo-600/30 border-indigo-400/50 text-indigo-300'
+                                            : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-300'
+                                        }`}
+                                      >
+                                        {weekdayNames[d]}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
