@@ -20,7 +20,8 @@ import {
   Info,
   Calendar,
   Zap,
-  CalendarCheck2
+  CalendarCheck2,
+  Plus
 } from 'lucide-react';
 
 let faceapi: any = null;
@@ -59,6 +60,26 @@ interface AbsentStudent {
   logId: string;
 }
 
+interface UploadedImage {
+  dataUrl: string;
+  embeddings: number[][];
+  boxes: any[];
+  detections: any[];
+  analyzed: boolean;
+}
+
+function dataURLtoBlob(dataurl: string) {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
 function GroupScanContent() {
   const router = useRouter();
   const supabase = createBrowserClient();
@@ -79,7 +100,8 @@ function GroupScanContent() {
   const [cameraLoading, setCameraLoading] = useState(false);
   
   // Image & Canvas state
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(-1);
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -96,6 +118,15 @@ function GroupScanContent() {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  // Scanned Status & History states
+  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
+  const [checkingExisting, setCheckingExisting] = useState(false);
+
+  // Computed property to maintain code compatibility
+  const uploadedImage = activeImageIndex >= 0 && activeImageIndex < uploadedImages.length
+    ? uploadedImages[activeImageIndex].dataUrl
+    : null;
+
   // 1. Load Batches
   useEffect(() => {
     async function loadBatches() {
@@ -105,17 +136,33 @@ function GroupScanContent() {
 
         const { data: profile } = await supabase
           .from('users')
-          .select('tenant_id')
+          .select('tenant_id, role')
           .eq('id', user.id)
           .single();
 
         if (!profile) return;
 
-        const { data: batchData } = await supabase
-          .from('batches')
-          .select('id, name, classes(name)')
-          .eq('tenant_id', profile.tenant_id)
-          .order('name', { ascending: true });
+        let batchData;
+        if (profile.role === 'coach') {
+          // Only show approved batches assigned to this coach
+          const { data: assigned } = await supabase
+            .from('coach_batch_assignments')
+            .select('batch_id, batches(id, name, classes(name))')
+            .eq('coach_id', user.id)
+            .eq('status', 'approved');
+
+          batchData = (assigned || [])
+            .map((a: any) => a.batches)
+            .filter(Boolean);
+        } else {
+          // Admins/Superadmins get all batches
+          const { data } = await supabase
+            .from('batches')
+            .select('id, name, classes(name)')
+            .eq('tenant_id', profile.tenant_id)
+            .order('name', { ascending: true });
+          batchData = data || [];
+        }
 
         const loadedBatches = (batchData || []) as unknown as BatchItem[];
         setBatches(loadedBatches);
@@ -128,6 +175,70 @@ function GroupScanContent() {
     }
     loadBatches();
   }, [supabase]);
+
+  // Check for existing photo uploads for this session
+  useEffect(() => {
+    if (!selectedBatch || !selectedDate) return;
+
+    async function checkExistingPhotos() {
+      setCheckingExisting(true);
+      try {
+        const { data, error } = await supabase
+          .from('group_attendance_photos')
+          .select('photo_url')
+          .eq('batch_id', selectedBatch)
+          .eq('date', selectedDate);
+        if (error) throw error;
+        setExistingPhotos((data || []).map((p: any) => p.photo_url));
+      } catch (err) {
+        console.error('Failed to check existing photos:', err);
+      } finally {
+        setCheckingExisting(false);
+      }
+    }
+
+    checkExistingPhotos();
+  }, [selectedBatch, selectedDate, supabase]);
+
+  const deletePhoto = (index: number) => {
+    setUploadedImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      
+      // Reset analysis status so they re-analyze the remaining photos
+      const resetImages = next.map(img => ({
+        ...img,
+        detections: [],
+        analyzed: false
+      }));
+
+      // Adjust active index
+      if (resetImages.length === 0) {
+        setActiveImageIndex(-1);
+      } else {
+        setActiveImageIndex((prevIndex) => {
+          if (prevIndex >= resetImages.length) return resetImages.length - 1;
+          return prevIndex;
+        });
+      }
+
+      setAnalyzed(false);
+      setMatchedStudents([]);
+      setAbsentStudents([]);
+      setUnrecognizedCount(0);
+
+      return resetImages;
+    });
+  };
+
+  const clearAllPhotos = () => {
+    setUploadedImages([]);
+    setActiveImageIndex(-1);
+    setAnalyzed(false);
+    setMatchedStudents([]);
+    setAbsentStudents([]);
+    setUnrecognizedCount(0);
+    setErrorMsg(null);
+  };
 
   // 2. Load enrolled students for the selected batch
   useEffect(() => {
@@ -232,21 +343,39 @@ function GroupScanContent() {
 
   // 4. Handle Drag & Drop / File Select Upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setErrorMsg(null);
+    setShowCamera(false);
+
+    // Read files and add them to uploadedImages list
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setUploadedImages((prev) => {
+          const newImg: UploadedImage = {
+            dataUrl,
+            embeddings: [],
+            boxes: [],
+            detections: [],
+            analyzed: false,
+          };
+          const next = [...prev, newImg];
+          if (next.length === 1) {
+            setActiveImageIndex(0);
+          }
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    });
 
     setAnalyzed(false);
     setMatchedStudents([]);
     setAbsentStudents([]);
     setUnrecognizedCount(0);
-    setErrorMsg(null);
-    setShowCamera(false);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setUploadedImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   // Capture photo from web camera frame
@@ -263,19 +392,32 @@ function GroupScanContent() {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
       
+      setErrorMsg(null);
+      
+      setUploadedImages((prev) => {
+        const newImg: UploadedImage = {
+          dataUrl,
+          embeddings: [],
+          boxes: [],
+          detections: [],
+          analyzed: false,
+        };
+        const next = [...prev, newImg];
+        setActiveImageIndex(next.length - 1);
+        return next;
+      });
+
       setAnalyzed(false);
       setMatchedStudents([]);
       setAbsentStudents([]);
       setUnrecognizedCount(0);
-      setErrorMsg(null);
-      setUploadedImage(dataUrl);
       setShowCamera(false);
     }
   };
 
   // 5. Run Face Analysis
   const handleAnalyzePhoto = async () => {
-    if (!uploadedImage || !imageRef.current || !canvasRef.current) return;
+    if (activeImageIndex < 0 || activeImageIndex >= uploadedImages.length || !imageRef.current || !canvasRef.current) return;
     setAnalyzing(true);
     setErrorMsg(null);
     setScanningProgress(10);
@@ -313,8 +455,8 @@ function GroupScanContent() {
     }, 200);
 
     try {
-      let embeddingsList: number[][] = [];
-      let mockBoxes: any[] = [];
+      let activeEmbeddings: number[][] = [];
+      let activeBoxes: any[] = [];
 
       if (isSimulator || forceSimulator || !faceapi) {
         // High fidelity simulation
@@ -340,7 +482,7 @@ function GroupScanContent() {
           const x = Math.floor(imgWidth * (0.2 + index * 0.3) - boxWidth / 2);
           const y = Math.floor(imgHeight * (0.35 + (index % 2) * 0.1) - boxHeight / 2);
 
-          mockBoxes.push({
+          activeBoxes.push({
             studentId: student.id,
             name: `${student.first_name} ${student.last_name}`,
             x,
@@ -352,11 +494,11 @@ function GroupScanContent() {
           // Generate a random 128-float unit vector embedding
           const raw = Array.from({ length: 128 }, () => Math.random() * 2 - 1);
           const magnitude = Math.sqrt(raw.reduce((sum, v) => sum + v * v, 0));
-          embeddingsList.push(raw.map((v) => v / magnitude));
+          activeEmbeddings.push(raw.map((v) => v / magnitude));
         });
 
         // Add 1 extra mock unrecognized face to simulate real world conditions
-        mockBoxes.push({
+        activeBoxes.push({
           studentId: null,
           name: 'Unrecognized Face',
           x: Math.floor(imgWidth * 0.75),
@@ -366,7 +508,7 @@ function GroupScanContent() {
         });
         const raw = Array.from({ length: 128 }, () => Math.random() * 2 - 1);
         const magnitude = Math.sqrt(raw.reduce((sum, v) => sum + v * v, 0));
-        embeddingsList.push(raw.map((v) => v / magnitude));
+        activeEmbeddings.push(raw.map((v) => v / magnitude));
 
       } else {
         // Real client-side face detection using face-api.js
@@ -382,16 +524,16 @@ function GroupScanContent() {
         if (!detections || detections.length === 0) {
           clearInterval(progressInterval);
           setAnalyzing(false);
-          setErrorMsg('No faces detected in the group photo. Please ensure faces are fully visible, clear, and well-lit. Alternatively, enable "AI Simulation Mode" to bypass.');
+          setErrorMsg('No faces detected in this photo. Please ensure faces are fully visible, clear, and well-lit. Alternatively, enable "AI Simulation Mode" to bypass.');
           return;
         }
 
         const resizedDetections = faceapi.resizeResults(detections, displaySize);
 
         resizedDetections.forEach((det: any) => {
-          embeddingsList.push(Array.from(det.descriptor));
+          activeEmbeddings.push(Array.from(det.descriptor));
           const box = det.detection.box;
-          mockBoxes.push({
+          activeBoxes.push({
             studentId: null,
             name: 'Scanning...',
             x: box.x,
@@ -405,6 +547,16 @@ function GroupScanContent() {
       clearInterval(progressInterval);
       setScanningProgress(100);
 
+      // Now combine embeddings from all OTHER analyzed images plus this active one
+      const combinedEmbeddings: number[][] = [];
+      uploadedImages.forEach((imgItem, idx) => {
+        if (idx === activeImageIndex) {
+          combinedEmbeddings.push(...activeEmbeddings);
+        } else if (imgItem.analyzed) {
+          combinedEmbeddings.push(...imgItem.embeddings);
+        }
+      });
+
       // Match face embeddings via server endpoint
       const response = await fetch('/api/v1/attendance/match-group', {
         method: 'POST',
@@ -412,7 +564,7 @@ function GroupScanContent() {
         body: JSON.stringify({
           batchId: selectedBatch,
           date: selectedDate,
-          embeddings: embeddingsList,
+          embeddings: combinedEmbeddings,
           simulate: isSimulator || forceSimulator,
         }),
       });
@@ -427,19 +579,169 @@ function GroupScanContent() {
       setAbsentStudents(payload.absentStudents || []);
       setUnrecognizedCount(payload.unrecognizedCount || 0);
 
-      // Render glowing HUD boxes onto the canvas overlay
+      // Distribute payload.detections back to the respective images
+      let startIndex = 0;
+      setUploadedImages((prev) => {
+        return prev.map((imgItem, idx) => {
+          if (idx === activeImageIndex) {
+            const mappedDetections = payload.detections.slice(startIndex, startIndex + activeEmbeddings.length);
+            startIndex += activeEmbeddings.length;
+            return {
+              ...imgItem,
+              embeddings: activeEmbeddings,
+              boxes: activeBoxes,
+              detections: mappedDetections,
+              analyzed: true,
+            };
+          } else if (imgItem.analyzed) {
+            const mappedDetections = payload.detections.slice(startIndex, startIndex + imgItem.embeddings.length);
+            startIndex += imgItem.embeddings.length;
+            return {
+              ...imgItem,
+              detections: mappedDetections,
+            };
+          }
+          return imgItem;
+        });
+      });
+
+      setAnalyzed(true);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Face matching endpoint failed. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleConfirmAndSave = async () => {
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Unauthenticated');
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) throw new Error('Profile not found');
+      const tenantId = profile.tenant_id;
+
+      // Filter to only uploaded images that have been analyzed
+      const analyzedImages = uploadedImages.filter(img => img.analyzed);
+      if (analyzedImages.length === 0) {
+        throw new Error('No analyzed photos to save. Please scan the photos first.');
+      }
+
+      // Upload all analyzed photos to storage and insert to group_attendance_photos
+      for (let i = 0; i < analyzedImages.length; i++) {
+        const img = analyzedImages[i];
+        
+        // Convert base64 dataUrl to Blob
+        const blob = dataURLtoBlob(img.dataUrl);
+        const fileExt = blob.type.split('/')[1] || 'jpg';
+        
+        // Construct file name path
+        const fileName = `${tenantId}/${selectedBatch}/${selectedDate}/${Date.now()}-${i}.${fileExt}`;
+        
+        // Upload to bucket 'attendance-photos'
+        const { data: uploadData, error: uploadErr } = await supabase.storage
+          .from('attendance-photos')
+          .upload(fileName, blob, {
+            contentType: blob.type,
+            upsert: true
+          });
+
+        if (uploadErr) {
+          console.error('Storage upload failed:', uploadErr);
+          throw new Error(`Failed to upload photo #${i + 1}: ${uploadErr.message}`);
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('attendance-photos')
+          .getPublicUrl(fileName);
+        
+        if (!urlData || !urlData.publicUrl) {
+          throw new Error(`Failed to get public URL for photo #${i + 1}`);
+        }
+
+        const photoUrl = urlData.publicUrl;
+
+        // Insert into group_attendance_photos
+        const { error: insertErr } = await supabase
+          .from('group_attendance_photos')
+          .insert({
+            tenant_id: tenantId,
+            batch_id: selectedBatch,
+            date: selectedDate,
+            photo_url: photoUrl
+          });
+
+        if (insertErr) {
+          console.error('DB insert failed:', insertErr);
+          throw new Error(`Failed to save record for photo #${i + 1}: ${insertErr.message}`);
+        }
+      }
+
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        router.push('/admin/attendance');
+      }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Failed to save attendance photos.');
+      setSubmitting(false);
+    }
+  };
+
+  // Redraw canvas whenever active image or its detections change
+  useEffect(() => {
+    if (activeImageIndex < 0 || activeImageIndex >= uploadedImages.length || !imageRef.current || !canvasRef.current) {
+      // Clear canvas
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    const activeImg = uploadedImages[activeImageIndex];
+    if (!activeImg.analyzed) {
+      // Clear canvas if not analyzed
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    const img = imageRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    const drawCanvas = () => {
+      const imgWidth = img.clientWidth || img.naturalWidth;
+      const imgHeight = img.clientHeight || img.naturalHeight;
+      if (imgWidth === 0 || imgHeight === 0) return;
+
       canvas.width = imgWidth;
       canvas.height = imgHeight;
+
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.lineWidth = 3;
-        
-        mockBoxes.forEach((box, idx) => {
+
+        activeImg.boxes.forEach((box, idx) => {
           let label = 'Unrecognized Face';
           let color = '#ef4444'; // Red glow for unrecognized
-          
-          // Both simulation and real modes now return 1:1 order via payload.detections
-          const det = payload.detections?.[idx];
+
+          const det = activeImg.detections?.[idx];
           if (det && det.matched) {
             label = `${det.name} (${Math.round(det.similarity)}%)`;
             color = '#10b981'; // Green glow for matching students
@@ -466,26 +768,14 @@ function GroupScanContent() {
           );
         });
       }
+    };
 
-      setAnalyzed(true);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Face matching endpoint failed. Please try again.');
-    } finally {
-      setAnalyzing(false);
+    if (img.complete) {
+      drawCanvas();
+    } else {
+      img.onload = drawCanvas;
     }
-  };
-
-  const handleConfirmAndSave = () => {
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      setSubmitSuccess(true);
-      setTimeout(() => {
-        router.push('/admin/attendance');
-      }, 1500);
-    }, 1000);
-  };
+  }, [activeImageIndex, uploadedImages]);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -535,6 +825,40 @@ function GroupScanContent() {
           
           {/* Settings Panel */}
           <div className="glass-panel p-5 rounded-3xl space-y-4">
+            {/* Scanned Status Check */}
+            {checkingExisting ? (
+              <div className="p-3.5 rounded-2xl border border-white/5 bg-slate-900/40 text-slate-400 text-xs flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                <span>Checking attendance upload history for this batch...</span>
+              </div>
+            ) : existingPhotos.length > 0 ? (
+              <div className="p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-xs flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                  <div>
+                    <span className="font-bold block">Attendance Photos Already Uploaded</span>
+                    <span className="opacity-80 block">You have already uploaded and scanned {existingPhotos.length} group photo(s) for this session today.</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-500/10">
+                  {existingPhotos.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="relative group w-14 h-14 rounded-lg overflow-hidden border border-emerald-500/20 bg-slate-900 cursor-pointer">
+                      <img src={url} alt={`Previous Scan ${i+1}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] font-bold text-white">View</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                <div>
+                  <span className="font-bold block">No Attendance Photos Scanned Today</span>
+                  <span className="opacity-80 block">Please capture or upload session photos to record attendance.</span>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
@@ -575,8 +899,14 @@ function GroupScanContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
                   AI Simulation Mode
+                  <span className="group relative cursor-pointer text-slate-500 hover:text-slate-300">
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="absolute bottom-full right-0 mb-2 w-64 p-2.5 rounded-lg border border-white/10 bg-slate-950 text-[10px] text-slate-400 font-normal leading-relaxed opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl z-30">
+                      Simulates biometric scans offline using mock bounding boxes and rosters. Useful when face-api model weights fail to load locally, or for instant testing.
+                    </span>
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -695,18 +1025,19 @@ function GroupScanContent() {
                   <Upload className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Upload Group Photo</h3>
+                  <h3 className="text-sm font-bold text-white">Upload Group Photos</h3>
                   <p className="text-[10px] text-slate-500 mt-1.5 leading-normal">
-                    Select a daily session group photo or capture one directly using your camera. The AI will scan, crop, map faces, and log attendance instantly.
+                    Select one or more group photos or capture them directly using your camera. The AI will scan faces across all photos and accumulate attendance.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full">
                   <label className="btn-secondary h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer justify-center flex-1">
                     <Upload className="w-3.5 h-3.5" />
-                    Select Image File
+                    Select Image Files
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -735,25 +1066,71 @@ function GroupScanContent() {
             )}
           </div>
 
+          {/* Thumbnails Row */}
+          {uploadedImages.length > 0 && !showCamera && (
+            <div className="glass-panel p-3.5 rounded-3xl flex items-center gap-3.5 overflow-x-auto no-scrollbar border border-white/5">
+              {uploadedImages.map((img, index) => (
+                <div
+                  key={index}
+                  className={`relative w-20 h-20 rounded-2xl overflow-hidden cursor-pointer border-2 transition-all flex-shrink-0 ${
+                    index === activeImageIndex
+                      ? 'border-indigo-500 scale-105 shadow-md shadow-indigo-500/20'
+                      : 'border-white/10 hover:border-white/30'
+                  }`}
+                  onClick={() => setActiveImageIndex(index)}
+                >
+                  <img src={img.dataUrl} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                  
+                  {/* Status Indicator */}
+                  <div className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border border-slate-950 ${
+                    img.analyzed ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`} title={img.analyzed ? 'Analyzed' : 'Unanalyzed'} />
+
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deletePhoto(index);
+                    }}
+                    className="absolute bottom-1.5 right-1.5 w-5 h-5 rounded-md bg-red-500/90 hover:bg-red-600 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Index Overlay */}
+                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded text-[8px] font-mono text-slate-300">
+                    #{index + 1}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add photo card inside row */}
+              <label className="w-20 h-20 rounded-2xl border-2 border-dashed border-white/10 hover:border-indigo-500/50 bg-white/5 hover:bg-indigo-500/5 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer flex-shrink-0 text-slate-400 hover:text-indigo-400">
+                <Plus className="w-5 h-5" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Add</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          )}
+
           {/* Action Trigger Buttons */}
           {uploadedImage && !showCamera && (
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => {
-                  setUploadedImage(null);
-                  setAnalyzed(false);
-                  setMatchedStudents([]);
-                  setAbsentStudents([]);
-                  setUnrecognizedCount(0);
-                  setErrorMsg(null);
-                }}
+                onClick={clearAllPhotos}
                 className="flex-1 min-w-[120px] h-12 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
               >
-                <RefreshCw className="w-4 h-4" /> Clear Photo
+                <RefreshCw className="w-4 h-4" /> Clear All Photos
               </button>
 
               <label className="flex-1 min-w-[120px] h-12 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2">
-                <Camera className="w-4 h-4 text-indigo-400" /> Recapture (Camera)
+                <Camera className="w-4 h-4 text-indigo-400" /> Add Photo (Camera)
                 <input
                   type="file"
                   accept="image/*"
@@ -765,20 +1142,15 @@ function GroupScanContent() {
 
               <button
                 onClick={() => {
-                  setUploadedImage(null);
-                  setAnalyzed(false);
-                  setMatchedStudents([]);
-                  setAbsentStudents([]);
-                  setUnrecognizedCount(0);
                   setErrorMsg(null);
                   setShowCamera(true);
                 }}
                 className="flex-1 min-w-[120px] h-12 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
               >
-                <Camera className="w-4 h-4 text-emerald-400" /> Recapture (Webcam)
+                <Camera className="w-4 h-4 text-emerald-400" /> Add Photo (Webcam)
               </button>
 
-              {!analyzed ? (
+              {(!uploadedImages[activeImageIndex]?.analyzed) ? (
                 <button
                   onClick={handleAnalyzePhoto}
                   disabled={analyzing || (loadingModels && !forceSimulator)}
@@ -790,15 +1162,16 @@ function GroupScanContent() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4.5 h-4.5" /> Analyze Group Photo
+                      <Sparkles className="w-4.5 h-4.5" /> Analyze Active Photo
                     </>
                   )}
                 </button>
               ) : (
                 <button
                   onClick={handleConfirmAndSave}
-                  disabled={submitting}
-                  className="flex-[2] min-w-[200px] h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-700/50 text-white text-xs font-bold transition-all duration-200 cursor-pointer glow-emerald flex items-center justify-center gap-2"
+                  disabled={submitting || uploadedImages.some(img => !img.analyzed)}
+                  title={uploadedImages.some(img => !img.analyzed) ? "Please analyze all uploaded photos first" : ""}
+                  className="flex-[2] min-w-[200px] h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all duration-200 cursor-pointer glow-emerald flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>

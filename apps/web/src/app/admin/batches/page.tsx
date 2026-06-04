@@ -13,10 +13,26 @@ import {
   UserCog,
   X,
   XCircle,
+  BookOpen,
+  Waves,
+  Trophy,
+  Target,
+  Award,
+  Activity,
+  Heart,
+  Trash2,
+  Users,
 } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface ClassItem {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+}
 
 interface BatchItem {
   id: string;
@@ -31,11 +47,6 @@ interface BatchItem {
     name: string;
   };
   students?: { id: string }[];
-}
-
-interface ClassOption {
-  id: string;
-  name: string;
 }
 
 interface CoachAssignment {
@@ -71,6 +82,62 @@ interface AvailableCoach {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Returns the appropriate Lucide icon corresponding to the class name context. */
+function getClassIcon(className: string) {
+  const name = className.toLowerCase();
+  if (name.includes('swim') || name.includes('water') || name.includes('pool') || name.includes('aqua')) {
+    return Waves;
+  }
+  if (name.includes('badminton') || name.includes('tennis') || name.includes('squash') || name.includes('racket') || name.includes('table tennis') || name.includes('ping pong')) {
+    return Target;
+  }
+  if (name.includes('karate') || name.includes('martial') || name.includes('taekwondo') || name.includes('judo') || name.includes('fight') || name.includes('combat') || name.includes('kung fu') || name.includes('kickboxing')) {
+    return Trophy;
+  }
+  if (name.includes('yoga') || name.includes('meditation') || name.includes('health') || name.includes('mindfulness') || name.includes('wellness') || name.includes('stretch')) {
+    return Heart;
+  }
+  if (name.includes('cricket') || name.includes('football') || name.includes('soccer') || name.includes('basket') || name.includes('sport') || name.includes('athletics')) {
+    return Trophy;
+  }
+  if (name.includes('fitness') || name.includes('gym') || name.includes('workout') || name.includes('crossfit') || name.includes('cardio') || name.includes('strength')) {
+    return Activity;
+  }
+  if (name.includes('dance') || name.includes('music') || name.includes('art') || name.includes('creative') || name.includes('ballet') || name.includes('hip hop')) {
+    return Sparkles;
+  }
+  return BookOpen;
+}
+
+/** Generates a tailored class description based on the class name. */
+function generateClassDescription(className: string): string {
+  const name = className.trim();
+  if (!name) return 'Please enter a class name first to generate a description.';
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('swim')) {
+    return `An immersive course focused on building water confidence, refining swim strokes, and teaching essential water safety skills. Designed to develop efficient technique and stamina in a supportive environment.`;
+  }
+  if (lowerName.includes('badminton')) {
+    return `Master the fundamentals of badminton, including grip techniques, footwork, shot precision, and match strategies. Suitable for players looking to enhance agility, reflexes, and court performance.`;
+  }
+  if (lowerName.includes('karate') || lowerName.includes('martial') || lowerName.includes('taekwondo')) {
+    return `A comprehensive training program emphasizing self-defense techniques, physical conditioning, discipline, and respect. Students progress through belt ranks while building focus and core strength.`;
+  }
+  if (lowerName.includes('yoga') || lowerName.includes('meditation')) {
+    return `A holistic practice combining physical postures, breathing exercises, and mindful meditation to improve flexibility, balance, and mental clarity. Perfect for stress reduction and physical alignment.`;
+  }
+  if (lowerName.includes('dance')) {
+    return `Express creativity and build rhythm through our vibrant dance sessions. Covers choreography, movement dynamics, and musicality across various styles to boost confidence and physical coordination.`;
+  }
+  if (lowerName.includes('cricket')) {
+    return `Develop core cricketing skills, including batting stance, bowling action, fielding drills, and game tactical awareness. Focuses on team collaboration, sportsmanship, and physical endurance.`;
+  }
+  if (lowerName.includes('fitness') || lowerName.includes('gym')) {
+    return `A high-energy functional fitness class designed to build strength, cardiovascular endurance, and core stability. Features guided circuit training and personalized goal tracking for all fitness levels.`;
+  }
+  return `A structured course in ${name} designed to build fundamental skills, enhance physical coordination, and foster a love for learning. Open to all skill levels with professional guidance and progress assessments.`;
+}
+
 /** Returns true if the coach's availability_slots string overlaps with the batch time window. */
 function slotsOverlap(
   availabilitySlots: string | null,
@@ -102,7 +169,22 @@ function slotsOverlap(
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<BatchItem[]>([]);
-  const [classesList, setClassesList] = useState<ClassOption[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [filterClassId, setFilterClassId] = useState<string | null>(null);
+  
+  const filteredBatches = filterClassId
+    ? batches.filter((b) => b.class_id === filterClassId)
+    : batches;
+
+  const [showClassModal, setShowClassModal] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+
+  // ── Class form state ──────────────────────────────────────────────────────
+  const [className, setClassName] = useState('');
+  const [classDescription, setClassDescription] = useState('');
+  const [isClassActive, setIsClassActive] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<BatchItem | null>(null);
@@ -130,6 +212,7 @@ export default function BatchesPage() {
   const [isActive, setIsActive] = useState(true);
 
   const supabase = createBrowserClient();
+  const classesList = classes.filter(c => c.is_active);
 
   const weekdayNames: Record<number, string> = {
     1: 'Mon',
@@ -236,17 +319,18 @@ export default function BatchesPage() {
 
       if (batchErr) throw batchErr;
 
-      // 2. Load Classes for dropdown selection
-      const { data: classData } = await supabase
+      // 2. Load Classes for dropdown selection and management
+      const { data: classData, error: classErr } = await supabase
         .from('classes')
-        .select('id, name')
+        .select('id, name, description, is_active')
         .eq('tenant_id', tenantId)
-        .eq('is_active', true)
         .order('name');
+
+      if (classErr) throw classErr;
 
       const loadedBatches = (batchData ?? []) as unknown as BatchItem[];
       setBatches(loadedBatches);
-      setClassesList(classData ?? []);
+      setClasses((classData ?? []) as ClassItem[]);
 
       // 3. Load coach assignments for all batches
       await loadAssignments(loadedBatches.map((b) => b.id));
@@ -368,6 +452,104 @@ export default function BatchesPage() {
     } catch (err) {
       console.error('Save failed:', err);
       alert('Failed to save batch slot.');
+    }
+  };
+
+  // ─── Class form handlers ───────────────────────────────────────────────────
+
+  const handleSaveClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!className.trim()) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) return;
+
+      if (editingClass) {
+        // Edit Mode
+        const { error } = await supabase
+          .from('classes')
+          .update({
+            name: className,
+            description: classDescription || null,
+            is_active: isClassActive,
+          })
+          .eq('id', editingClass.id);
+
+        if (error) throw error;
+        flashSuccess('Class updated successfully.');
+      } else {
+        // Add Mode
+        const { error } = await supabase
+          .from('classes')
+          .insert({
+            tenant_id: profile.tenant_id,
+            name: className,
+            description: classDescription || null,
+            is_active: true,
+          });
+
+        if (error) throw error;
+        flashSuccess('Class registered successfully.');
+      }
+
+      setClassName('');
+      setClassDescription('');
+      setIsClassActive(true);
+      setShowClassModal(false);
+      setEditingClass(null);
+      await loadBatchesAndClasses();
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert('Failed to save class.');
+    }
+  };
+
+  const handleEditClassClick = (item: ClassItem) => {
+    setEditingClass(item);
+    setClassName(item.name);
+    setClassDescription(item.description || '');
+    setIsClassActive(item.is_active);
+    setShowClassModal(true);
+  };
+
+  const handleToggleClassStatus = async (item: ClassItem) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({ is_active: !item.is_active })
+        .eq('id', item.id);
+
+      if (error) throw error;
+      flashSuccess(`Class status toggled.`);
+      await loadBatchesAndClasses();
+    } catch (err) {
+      console.error('Toggle status failed:', err);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) return;
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classId);
+
+      if (error) throw error;
+      flashSuccess('Class deleted successfully.');
+      await loadBatchesAndClasses();
+    } catch (err) {
+      console.error('Delete class failed:', err);
+      alert('Failed to delete class.');
     }
   };
 
@@ -528,59 +710,239 @@ export default function BatchesPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-            <Sparkles className="w-4 h-4" /> Weekly Slots
+            <Sparkles className="w-4 h-4" /> Academy Administration
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Batch Schedule Control
+            Batch Management
           </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Configure your academic course streams, class slots, active check-in schedules, and roster coach assignments.
+          </p>
         </div>
-        {isAdminOrSuperadmin && (
-          <button
-            onClick={() => {
-              setEditingBatch(null);
-              setClassId('');
-              setName('');
-              setStartTime('09:00');
-              setEndTime('10:00');
-              setMaxCapacity('30');
-              setDaysOfWeek([]);
-              setIsActive(true);
-              setShowAddModal(true);
-            }}
-            className="btn-premium h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer self-start md:self-auto"
-          >
-            <Plus className="w-4 h-4" /> Add New Batch
-          </button>
-        )}
       </div>
 
-      {/* ── Main Table Container ── */}
-      {loading ? (
-        <div className="h-64 flex flex-col items-center justify-center">
-          <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
-        </div>
-      ) : batches.length === 0 ? (
-        <div className="glass-panel p-12 rounded-3xl text-center max-w-md mx-auto">
-          <Calendar className="w-12 h-12 text-indigo-400/40 mx-auto mb-4" />
-          <h3 className="text-sm font-bold text-white mb-1">No Active Batches</h3>
-          <p className="text-xs text-slate-500 leading-relaxed mb-6">
-            Assign custom class schedules, active check-in windows, and set capacity thresholds for
-            students.
-          </p>
+      {/* ── Section 1: Class Streams ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-400" /> Class Streams
+            </h2>
+            <p className="text-[11px] text-slate-400">Course categories, subjects, or sports disciplines</p>
+          </div>
           {isAdminOrSuperadmin && (
             <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-premium h-9 px-4 rounded-xl text-xs font-bold cursor-pointer"
+              onClick={() => {
+                setEditingClass(null);
+                setClassName('');
+                setClassDescription('');
+                setIsClassActive(true);
+                setShowClassModal(true);
+              }}
+              className="btn-premium h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
-              Create Your First Batch
+              <Plus className="w-3.5 h-3.5" /> Add New Class
             </button>
           )}
         </div>
-      ) : (
+
+        {loading ? (
+          <div className="h-32 flex items-center justify-center">
+            <div className="w-6 h-6 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+          </div>
+        ) : classes.length === 0 ? (
+          <div className="glass-panel p-8 rounded-2xl text-center max-w-md mx-auto">
+            <BookOpen className="w-10 h-10 text-indigo-400/40 mx-auto mb-3" />
+            <h3 className="text-xs font-bold text-white mb-1">No Classes Registered</h3>
+            <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
+              Register your institute's subjects, courses, or disciplines (e.g. Advanced Swimming, Intermediate Karate).
+            </p>
+            {isAdminOrSuperadmin && (
+              <button
+                onClick={() => setShowClassModal(true)}
+                className="btn-premium h-8 px-3 rounded-lg text-[10px] font-bold cursor-pointer"
+              >
+                Create Your First Class
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classes.map((item) => {
+              const classBatches = batches.filter((b) => b.class_id === item.id);
+              const batchesCount = classBatches.length;
+              const sessionsPerWeek = classBatches.reduce((acc, b) => acc + (b.days_of_week?.length || 0), 0);
+              const IconComponent = getClassIcon(item.name);
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setFilterClassId(prev => prev === item.id ? null : item.id)}
+                  className={`glass-panel p-5 rounded-2xl flex flex-col justify-between min-h-[220px] relative group transition-all duration-300 cursor-pointer ${
+                    filterClassId === item.id
+                      ? 'border-indigo-500 ring-2 ring-indigo-500/25 bg-indigo-500/5 shadow-lg shadow-indigo-500/10 scale-[1.02]'
+                      : 'border-white/10 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5'
+                  }`}
+                  style={{
+                    background: filterClassId === item.id
+                      ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.02) 100%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)',
+                  }}
+                >
+                  <div>
+                    {/* Top Row: Icon Container and Active Badge */}
+                    <div className="flex justify-between items-start">
+                      <div className="w-12 h-12 rounded-xl bg-slate-900/40 border border-white/10 flex items-center justify-center text-slate-300">
+                        <IconComponent className="w-6 h-6" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {filterClassId === item.id && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 animate-pulse">
+                            Filtering
+                          </span>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleClassStatus(item);
+                          }}
+                          disabled={!isAdminOrSuperadmin}
+                          className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border transition-all cursor-pointer
+                          ${item.is_active 
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                            : 'bg-slate-800 border-white/5 text-slate-500'} disabled:cursor-default`}
+                        >
+                          {item.is_active ? 'Active' : 'Inactive'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Class Title */}
+                    <h3 className="text-base font-extrabold text-white mt-4 tracking-tight">
+                      {item.name}
+                    </h3>
+
+                    {/* Class Description */}
+                    <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                      {item.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  {/* Bottom Stats & Action buttons */}
+                  <div className="mt-4 pt-3 border-t border-white/5 flex items-end justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{sessionsPerWeek} Session{sessionsPerWeek !== 1 ? 's' : ''}/Week</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{batchesCount} Batch{batchesCount !== 1 ? 'es' : ''}</span>
+                      </div>
+                    </div>
+
+                    {isAdminOrSuperadmin && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClassClick(item);
+                          }}
+                          className="btn-secondary w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white border border-white/10 hover:bg-white/5 transition-colors cursor-pointer"
+                          title="Edit Class Details"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {batchesCount === 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClass(item.id);
+                            }}
+                            className="btn-secondary w-9 h-9 rounded-xl flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/10 hover:border-red-500/30 transition-colors cursor-pointer"
+                            title="Delete Class"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Horizontal Divider */}
+      <hr className="border-white/10" />
+
+      {/* ── Section 2: Batch Scheduling Control ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-indigo-400" /> Batch assignment
+              {filterClassId && (
+                <span className="text-xs font-semibold text-slate-400 bg-white/5 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                  filtered by Class
+                  <button 
+                    onClick={() => setFilterClassId(null)}
+                    className="hover:text-white text-indigo-400 hover:bg-white/5 rounded-full p-0.5 transition-colors cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-400">Manage batch times, active days, student capacity, and coaching rosters</p>
+          </div>
+          {isAdminOrSuperadmin && (
+            <button
+              onClick={() => {
+                setEditingBatch(null);
+                setClassId('');
+                setName('');
+                setStartTime('09:00');
+                setEndTime('10:00');
+                setMaxCapacity('30');
+                setDaysOfWeek([]);
+                setIsActive(true);
+                setShowAddModal(true);
+              }}
+              className="btn-premium h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add New Batch
+            </button>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="h-32 flex items-center justify-center">
+            <div className="w-6 h-6 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+          </div>
+        ) : batches.length === 0 ? (
+          <div className="glass-panel p-8 rounded-2xl text-center max-w-md mx-auto">
+            <Calendar className="w-10 h-10 text-indigo-400/40 mx-auto mb-3" />
+            <h3 className="text-xs font-bold text-white mb-1">No Active Batches</h3>
+            <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
+              Configure batch slots, capacity limits, and assign coaches to schedules.
+            </p>
+            {isAdminOrSuperadmin && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="btn-premium h-8 px-3 rounded-lg text-[10px] font-bold cursor-pointer"
+              >
+                Create Your First Batch
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="glass-panel rounded-2xl overflow-hidden border border-white/10">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead>
+               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-300">
                   <th className="p-4 w-[15%] min-w-[120px]">Batch Name</th>
                   <th className="p-4 w-[15%] min-w-[130px]">Linked Course / Class</th>
@@ -590,53 +952,68 @@ export default function BatchesPage() {
                   <th className="p-4 w-[10%] min-w-[90px]">Max Capacity</th>
                   <th className="p-4 w-[8%] min-w-[80px]">Status</th>
                   <th className="p-4 w-[15%] min-w-[160px]">Coaches</th>
-                  <th className="p-4 text-right w-[10%] min-w-[80px]">Actions</th>
+                  {isAdminOrSuperadmin && <th className="p-4 text-right w-[10%] min-w-[80px]">Actions</th>}
                 </tr>
               </thead>
               <tbody className="text-xs divide-y divide-white/5 text-slate-300">
-                {batches.map((item) => {
+                {filteredBatches.map((item) => {
                   const batchAssignments = assignments[item.id] ?? [];
                   const approved = batchAssignments.filter((a) => a.status === 'approved');
                   const pending = batchAssignments.filter((a) => a.status === 'pending');
 
-                  // For coaches: find their own assignment for this batch
                   const myAssignment = isCoachRole
                     ? batchAssignments.find((a) => a.coach.id === currentUserId)
                     : null;
-                  const alreadyAssigned = !!myAssignment;
+
+                  const isBatchAssigned = isCoachRole
+                    ? (myAssignment && myAssignment.status === 'approved')
+                    : (approved.length > 0);
+
+                  const nameColor = isBatchAssigned
+                    ? 'text-emerald-400 font-extrabold'
+                    : 'text-slate-200 font-bold';
 
                   return (
                     <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="p-4 font-bold text-slate-200">{item.name}</td>
+                      <td className={`p-4 ${nameColor}`}>{item.name}</td>
                       <td className="p-4">{item.classes.name}</td>
                       <td className="p-4 text-slate-400 font-medium">
                         {item.start_time.slice(0, 5)} - {item.end_time.slice(0, 5)}
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
-                          {item.days_of_week.map((day) => (
-                            <span
-                              key={day}
-                              className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold text-indigo-400"
-                            >
-                              {weekdayNames[day]}
-                            </span>
-                          ))}
+                          {item.days_of_week.map((day) => {
+                            const isAssignedDay = isCoachRole && myAssignment && myAssignment.status === 'approved'
+                              ? (myAssignment.assigned_days || item.days_of_week || []).includes(day)
+                              : false;
+
+                            const dayClass = isAssignedDay
+                              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold"
+                              : "bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold";
+
+                            return (
+                              <span
+                                key={day}
+                                className={`px-1.5 py-0.5 rounded text-[9px] ${dayClass}`}
+                              >
+                                {weekdayNames[day]}
+                              </span>
+                            );
+                          })}
                         </div>
                       </td>
                       <td className="p-4 font-semibold text-indigo-400">{item.students?.length ?? 0} students</td>
                       <td className="p-4">{item.max_capacity} students</td>
                       <td className="p-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border
-                            ${
-                              item.is_active
-                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                : 'bg-slate-800 border-white/5 text-slate-500'
-                            }`}
-                        >
-                          {item.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                        {isBatchAssigned ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                            <Check className="w-2.5 h-2.5" /> Assigned
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border bg-amber-500/10 border border-amber-500/20 text-amber-500">
+                            Unassigned
+                          </span>
+                        )}
                       </td>
 
                       {/* ── Coaches Column ── */}
@@ -685,15 +1062,11 @@ export default function BatchesPage() {
                           {isCoachRole && (
                             <div className="mt-1 flex flex-col items-start gap-1">
                               {myAssignment && myAssignment.status !== 'rejected' ? (
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                                    myAssignment.status === 'approved'
-                                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                      : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                                  }`}
-                                >
-                                  {myAssignment.status === 'approved' ? '✓ Assigned' : '⏳ Pending'}
-                                </span>
+                                myAssignment.status === 'approved' ? null : (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-500/10 border-amber-500/20 text-amber-400">
+                                    ⏳ Pending
+                                  </span>
+                                )
                               ) : (
                                 <div className="flex flex-col items-start gap-1">
                                   {myAssignment?.status === 'rejected' && (
@@ -729,24 +1102,32 @@ export default function BatchesPage() {
                       </td>
 
                       {/* ── Actions Column ── */}
-                      <td className="p-4 text-right">
-                        {isAdminOrSuperadmin && (
+                      {isAdminOrSuperadmin && (
+                        <td className="p-4 text-right">
                           <button
                             onClick={() => handleEditClick(item)}
                             className="btn-secondary h-7 px-2.5 rounded-lg text-[10px] font-bold cursor-pointer"
                           >
                             <Edit2 className="w-3 h-3 mr-1 inline-block" /> Edit
                           </button>
-                        )}
-                      </td>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
+                {filteredBatches.length === 0 && (
+                  <tr>
+                    <td colSpan={isAdminOrSuperadmin ? 9 : 8} className="p-8 text-center text-slate-500 italic font-medium">
+                      No batches found for this class. Select another class card or click "Add New Batch" to configure one.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+      </div>
 
       {/* ── Modal: Create / Update Batch Scheduling ── */}
       {showAddModal && (
@@ -1293,6 +1674,112 @@ export default function BatchesPage() {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modal: Add / Edit Class Form ── */}
+      {showClassModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md glass-panel p-6 rounded-2xl relative">
+            <button
+              onClick={() => setShowClassModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-white mb-6">
+              {editingClass ? 'Edit Class Details' : 'Register New Class'}
+            </h3>
+
+            <form onSubmit={handleSaveClass} className="space-y-4">
+              {/* Class Name */}
+              <div className="space-y-1">
+                <label className="text-slate-300 text-xs font-semibold block">Class Name</label>
+                <input
+                  type="text"
+                  required
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  placeholder="e.g. Advanced Swimming Pool-A"
+                  className="w-full h-10 px-4 rounded-xl glass-input text-xs"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-slate-300 text-xs font-semibold block">Description</label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!className.trim()) {
+                        alert('Please enter a Class Name first.');
+                        return;
+                      }
+                      setIsGeneratingDesc(true);
+                      await new Promise((resolve) => setTimeout(resolve, 800));
+                      setClassDescription(generateClassDescription(className));
+                      setIsGeneratingDesc(false);
+                    }}
+                    disabled={isGeneratingDesc || !className.trim()}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                  >
+                    {isGeneratingDesc ? (
+                      <>
+                        <span className="w-2.5 h-2.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                        Suggest AI Description
+                      </>
+                    )}
+                  </button>
+                </div>
+                <textarea
+                  rows={4}
+                  value={classDescription}
+                  onChange={(e) => setClassDescription(e.target.value)}
+                  placeholder="Summarize course content, levels, or guidelines..."
+                  className="w-full p-3 rounded-xl glass-input text-xs"
+                />
+              </div>
+
+              {/* Edit Mode Status Toggle */}
+              {editingClass && (
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={isClassActive}
+                    onChange={(e) => setIsClassActive(e.target.checked)}
+                    className="w-4 h-4 accent-indigo-500 rounded border-white/10"
+                  />
+                  <label htmlFor="isActive" className="text-xs text-slate-300 font-medium">
+                    This class is currently Active
+                  </label>
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowClassModal(false)}
+                  className="btn-secondary h-9 px-4 rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-premium h-9 px-4 rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  {editingClass ? 'Update Class' : 'Create Class'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

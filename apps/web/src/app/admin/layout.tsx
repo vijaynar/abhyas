@@ -105,7 +105,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   const manageItems = [
-    { name: 'Classes', href: '/admin/classes', icon: BookOpen },
     { name: 'Batches', href: '/admin/batches', icon: Calendar },
     ...(isAdmin ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
     { name: 'Students', href: '/admin/students', icon: Users },
@@ -121,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(isAdmin ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
     ...(isAdmin ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
     ...(isAdmin ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
-    ...(isAdmin ? [{ name: 'Portal Settings', href: '/admin/settings', icon: Settings }] : []),
+    ...(isAdmin ? [{ name: 'Global Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
   const renderNavItem = (item: { name: string; href: string; icon: any }) => {

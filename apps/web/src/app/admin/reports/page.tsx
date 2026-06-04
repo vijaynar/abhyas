@@ -38,7 +38,7 @@ interface BatchItem {
 interface StudentItem {
   id: string;
   student_custom_id: string;
-  batch_id: string;
+  batch_id: string | null;
   users: {
     first_name: string;
     last_name: string;
@@ -93,10 +93,12 @@ export default function AdminReportsPage() {
   const [studentsInBatch, setStudentsInBatch] = useState<StudentItem[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [finesLogs, setFinesLogs] = useState<FineItem[]>([]);
+  const [studentRemovals, setStudentRemovals] = useState<{ student_id: string; removed_at: string; remark: string | null }[]>([]);
 
   // Individual student states (for Tab 2)
   const [singleStudentAttendance, setSingleStudentAttendance] = useState<AttendanceRecord[]>([]);
   const [singleStudentFines, setSingleStudentFines] = useState<FineItem[]>([]);
+  const [singleStudentRemoval, setSingleStudentRemoval] = useState<any | null>(null);
 
   const supabase = createBrowserClient();
 
@@ -225,35 +227,62 @@ export default function AdminReportsPage() {
       }
       setAssignmentDate(assignDate);
 
-      // 1. Fetch all students in that batch
-      const { data: stus } = await supabase
+      // 1. Fetch current students in that batch
+      const { data: currentStus } = await supabase
         .from('students')
         .select('id, student_custom_id, batch_id, users(first_name, last_name)')
-        .eq('batch_id', selectedBatch)
-        .order('student_custom_id', { ascending: true });
-      
-      const compiledStus = (stus || []) as unknown as StudentItem[];
-      setStudentsInBatch(compiledStus);
+        .eq('batch_id', selectedBatch);
 
-      // 2. Fetch attendance logs of the month
+      // 2. Fetch student removals for this batch
+      const { data: removalsData } = await supabase
+        .from('student_removals')
+        .select('student_id, removed_at, remark')
+        .eq('batch_id', selectedBatch);
+
+      const compiledRemovals = (removalsData || []) as { student_id: string; removed_at: string; remark: string | null }[];
+      setStudentRemovals(compiledRemovals);
+
+      // 3. Fetch attendance logs of the month specifically for this batch
       const startOfMonth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
       const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       const endOfMonth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      // Get log data
+      // Get log data for the selected batch
       const { data: logs } = await supabase
         .from('attendance_logs')
         .select('id, student_id, date, status, check_in')
+        .eq('batch_id', selectedBatch)
         .gte('date', startOfMonth)
         .lte('date', endOfMonth);
       
-      let filteredLogs = (logs || []) as AttendanceRecord[];
+      const compiledLogs = (logs || []) as AttendanceRecord[];
+
+      // 4. Gather all student IDs that belong to the roster for this batch in this month
+      const rosterStudentIds = new Set<string>();
+      (currentStus || []).forEach((s: any) => rosterStudentIds.add(s.id));
+      compiledRemovals.forEach(r => rosterStudentIds.add(r.student_id));
+      compiledLogs.forEach(l => rosterStudentIds.add(l.student_id));
+
+      // 5. Fetch profiles of all students in the roster (historical + current)
+      let compiledStus: StudentItem[] = [];
+      if (rosterStudentIds.size > 0) {
+        const { data: fetchedStus } = await supabase
+          .from('students')
+          .select('id, student_custom_id, batch_id, users(first_name, last_name)')
+          .in('id', Array.from(rosterStudentIds))
+          .order('student_custom_id', { ascending: true });
+        
+        compiledStus = (fetchedStus || []) as unknown as StudentItem[];
+      }
+      setStudentsInBatch(compiledStus);
+
+      let filteredLogs = compiledLogs;
       if (assignDate) {
         filteredLogs = filteredLogs.filter(log => log.date >= assignDate);
       }
       setAttendanceLogs(filteredLogs);
 
-      // 3. Fetch fines of the month
+      // 6. Fetch fines of the month for the roster students
       const { data: fines } = await supabase
         .from('fines')
         .select('id, student_id, amount, reason, status, issued_date')
@@ -267,6 +296,8 @@ export default function AdminReportsPage() {
           return fineDateStr >= assignDate;
         });
       }
+      // Filter fines to only roster students
+      filteredFines = filteredFines.filter(f => rosterStudentIds.has(f.student_id));
       setFinesLogs(filteredFines);
 
     } catch (err) {
@@ -281,7 +312,34 @@ export default function AdminReportsPage() {
     setLoadingReport(true);
     try {
       const studentObj = allStudents.find(s => s.id === selectedStudent);
-      const studentBatchId = studentObj?.batch_id;
+      let studentBatchId = studentObj?.batch_id;
+
+      // Look up last active batch from attendance history if current batch_id is null
+      if (!studentBatchId) {
+        const { data: lastLog } = await supabase
+          .from('attendance_logs')
+          .select('batch_id')
+          .eq('student_id', selectedStudent)
+          .order('date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastLog) {
+          studentBatchId = lastLog.batch_id;
+        }
+      }
+
+      // Fetch removal record if exists for this batch
+      if (studentBatchId) {
+        const { data: removal } = await supabase
+          .from('student_removals')
+          .select('removed_at, remark')
+          .eq('student_id', selectedStudent)
+          .eq('batch_id', studentBatchId)
+          .maybeSingle();
+        setSingleStudentRemoval(removal);
+      } else {
+        setSingleStudentRemoval(null);
+      }
 
       // Get assignment date if coach
       let assignDate: string | null = null;
@@ -414,12 +472,20 @@ export default function AdminReportsPage() {
       let lat = 0;
       let abs = 0;
 
+      const removal = studentRemovals.find(r => r.student_id === stu.id);
+      const removedDateStr = removal ? new Date(removal.removed_at).toISOString().split('T')[0] : null;
+
       for (let d = 1; d <= daysInMonth; d++) {
         const dStr = String(d).padStart(2, '0');
         const mStr = String(selectedMonth + 1).padStart(2, '0');
         const dateStr = `${selectedYear}-${mStr}-${dStr}`;
 
         if (assignmentDate && dateStr < assignmentDate) {
+          row.push('N/A');
+          continue;
+        }
+
+        if (removedDateStr && dateStr > removedDateStr) {
           row.push('N/A');
           continue;
         }
@@ -480,17 +546,24 @@ export default function AdminReportsPage() {
   };
 
   // Compile individual student statistics (Tab 2)
+  const studentRemovalDateStr = singleStudentRemoval
+    ? new Date(singleStudentRemoval.removed_at).toISOString().split('T')[0]
+    : null;
+
   let indPresent = 0;
   let indLate = 0;
   let indAbsent = 0;
 
   singleStudentAttendance.forEach((log) => {
+    if (studentRemovalDateStr && log.date > studentRemovalDateStr) return;
+    if (assignmentDate && log.date < assignmentDate) return;
+
     if (log.status === 'present') indPresent++;
     else if (log.status === 'late') indLate++;
     else if (log.status === 'absent') indAbsent++;
   });
 
-  const indTotalLogs = singleStudentAttendance.length;
+  const indTotalLogs = indPresent + indLate + indAbsent;
   const indAttended = indPresent + indLate;
   const indRatio = indTotalLogs > 0 ? Math.round((indAttended / indTotalLogs) * 100) : 0;
 
@@ -510,6 +583,9 @@ export default function AdminReportsPage() {
     let lateC = 0;
     let absentC = 0;
 
+    const removal = studentRemovals.find(r => r.student_id === stu.id);
+    const removedDateStr = removal ? new Date(removal.removed_at).toISOString().split('T')[0] : null;
+
     for (let d = 1; d <= daysInMonth; d++) {
       const dayNum = d;
       const dStr = String(dayNum).padStart(2, '0');
@@ -517,6 +593,10 @@ export default function AdminReportsPage() {
       const dateStr = `${selectedYear}-${mStr}-${dStr}`;
 
       if (assignmentDate && dateStr < assignmentDate) {
+        continue;
+      }
+
+      if (removedDateStr && dateStr > removedDateStr) {
         continue;
       }
 
@@ -970,6 +1050,17 @@ export default function AdminReportsPage() {
                                       );
                                     }
 
+                                    const removal = studentRemovals.find(r => r.student_id === stu.id);
+                                    const removedDateStr = removal ? new Date(removal.removed_at).toISOString().split('T')[0] : null;
+
+                                    if (removedDateStr && dateStr > removedDateStr) {
+                                      return (
+                                        <td key={`cell-${dIdx}`} className="py-3 px-2 text-center border-r border-white/5 font-mono text-slate-600/40 font-normal">
+                                          N/A
+                                        </td>
+                                      );
+                                    }
+
                                     const log = attendanceLogs.find(l => l.student_id === stu.id && l.date === dateStr);
                                     
                                     let marker = '';
@@ -1190,7 +1281,14 @@ export default function AdminReportsPage() {
                             let textClass = 'text-slate-400';
                             let tag = '';
 
+                            const removal = singleStudentRemoval;
+                            const removedDateStr = removal ? new Date(removal.removed_at).toISOString().split('T')[0] : null;
+
                             if (assignmentDate && dateStr < assignmentDate) {
+                              cellClass = 'bg-slate-900/40 border border-dashed border-white/5';
+                              textClass = 'text-slate-600';
+                              tag = 'N/A';
+                            } else if (removedDateStr && dateStr > removedDateStr) {
                               cellClass = 'bg-slate-900/40 border border-dashed border-white/5';
                               textClass = 'text-slate-600';
                               tag = 'N/A';

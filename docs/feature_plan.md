@@ -229,7 +229,7 @@ Here are the detailed UI structures and interactive layouts for both the adminis
 ### A. Admin Web Dashboard (SaaS Portal)
 *   **Purpose:** The control center for institute owners and administrative staff. It displays operational vitals, pending anomalies, and the payment verification queue.
 *   **Layout Structure:** Modern sidebar layout with responsive structural panels.
-    *   **Sidebar Navigation:** Dashboard | Classes & Batches | Students Ledger | Health & Sports Vault | Financial Fines | **Payment Queue [1]** | AI Audit Logs | Portal Settings
+    *   **Sidebar Navigation:** Dashboard | Classes & Batches | Students Ledger | Health & Sports Vault | Financial Fines | **Payment Queue [1]** | AI Audit Logs | Global Settings
     *   **Header Panel:** Multi-tenant profile selector, dynamic notification bell, active system system-health status indicator.
 *   **Mock Wireframe:**
 ```
@@ -243,7 +243,7 @@ Here are the detailed UI structures and interactive layouts for both the adminis
  [ ] Fines & Ledger  |  [09:04] Arjun S. - Present (98% match)  | [!] Arjun Sharma - ₹1,000
  [x] Payment Queue   |  [09:03] Riya M.  - Present (94% match)  |     Method: UPI | Ref: UPI12345678
  [ ] AI Insights     |  [09:01] Kabir D. - Late (5 min grace)    |     File: [ View Screenshot ]
- [ ] Settings        |  [08:59] Diya K.  - Present (99% match)  |     [ APPROVE ]  [ REJECT ]
+ [ ] Global Settings |  [08:59] Diya K.  - Present (99% match)  |     [ APPROVE ]  [ REJECT ]
 ========================================================================================
 ```
 *   **Key Interactive Widgets:**

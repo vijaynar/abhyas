@@ -115,6 +115,71 @@ export default function StudentsPage() {
 
   const supabase = createBrowserClient();
 
+  // Resizable columns state & helpers
+  const [columnWidths, setColumnWidths] = useState({
+    customId: 120,
+    name: 220,
+    batch: 200,
+    status: 130,
+    joiningDate: 150,
+    actions: 180
+  });
+
+  const handleResizeStart = (colName: keyof typeof columnWidths, startEvent: React.MouseEvent) => {
+    startEvent.preventDefault();
+    const startX = startEvent.clientX;
+    const startWidth = columnWidths[colName];
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      setColumnWidths((prev) => ({
+        ...prev,
+        [colName]: Math.max(80, startWidth + deltaX)
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Student removal states & handlers
+  const [removingStudent, setRemovingStudent] = useState<StudentItem | null>(null);
+  const [removalRemark, setRemovalRemark] = useState('');
+  const [removalLoading, setRemovalLoading] = useState(false);
+
+  const handleRemoveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!removingStudent) return;
+    setRemovalLoading(true);
+    try {
+      const response = await fetch('/api/v1/students/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: removingStudent.id,
+          remark: removalRemark
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to remove student');
+
+      setRemovingStudent(null);
+      setRemovalRemark('');
+      alert('Student successfully removed from batch.');
+      await loadStudents();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Connection error');
+    } finally {
+      setRemovalLoading(false);
+    }
+  };
+
   const loadBatches = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -329,15 +394,47 @@ export default function StudentsPage() {
       {/* Students Data-Table */}
       <div className="glass-panel rounded-3xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table style={{ tableLayout: 'fixed' }} className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.01]">
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[10%] min-w-[95px]">Custom ID</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[30%] min-w-[220px]">Student Name</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[20%] min-w-[180px]">Batch Schedule</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[140px]">Face Bio Status</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider w-[15%] min-w-[120px]">Joined Date</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right w-[10%] min-w-[110px]">Actions</th>
+                <th style={{ width: columnWidths.customId }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Custom ID
+                  <div
+                    onMouseDown={(e) => handleResizeStart('customId', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 bg-transparent active:bg-indigo-600 z-10"
+                  />
+                </th>
+                <th style={{ width: columnWidths.name }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Student Name
+                  <div
+                    onMouseDown={(e) => handleResizeStart('name', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 bg-transparent active:bg-indigo-600 z-10"
+                  />
+                </th>
+                <th style={{ width: columnWidths.batch }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Batch Schedule
+                  <div
+                    onMouseDown={(e) => handleResizeStart('batch', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 bg-transparent active:bg-indigo-600 z-10"
+                  />
+                </th>
+                <th style={{ width: columnWidths.status }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Face Bio Status
+                  <div
+                    onMouseDown={(e) => handleResizeStart('status', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 bg-transparent active:bg-indigo-600 z-10"
+                  />
+                </th>
+                <th style={{ width: columnWidths.joiningDate }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Joined Date
+                  <div
+                    onMouseDown={(e) => handleResizeStart('joiningDate', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 bg-transparent active:bg-indigo-600 z-10"
+                  />
+                </th>
+                <th style={{ width: columnWidths.actions }} className="relative py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -408,6 +505,17 @@ export default function StudentsPage() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex justify-end gap-2">
+                          {student.batch && (
+                            <button
+                              onClick={() => {
+                                setRemovingStudent(student);
+                                setRemovalRemark('');
+                              }}
+                              className="h-8 px-2.5 rounded-lg text-[10px] font-bold border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-400 cursor-pointer flex items-center gap-1"
+                            >
+                              Remove
+                            </button>
+                          )}
                           <Link
                             href={`/admin/enroll-face?studentId=${student.id}`}
                             className={`h-8 px-2.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 cursor-pointer transition-all duration-200 
@@ -416,7 +524,7 @@ export default function StudentsPage() {
                               : 'bg-indigo-600 hover:bg-indigo-500 text-white glow-indigo'}`}
                           >
                             <Camera className="w-3.5 h-3.5" />
-                            {isEnrolled ? 'Re-enroll Face' : 'Enroll Face'}
+                            {isEnrolled ? 'Re-enroll' : 'Enroll'}
                           </Link>
                         </div>
                       </td>
@@ -453,6 +561,63 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Modal: Remove Student from Batch ── */}
+      {removingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md glass-panel p-6 rounded-3xl space-y-5 relative">
+            <button
+              onClick={() => setRemovingStudent(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2 text-red-400 text-[10px] font-bold tracking-widest uppercase mb-1">
+                <AlertCircle className="w-3.5 h-3.5" /> De-enrollment Pipeline
+              </div>
+              <h3 className="text-lg font-bold text-white">Remove Student from Batch</h3>
+              <p className="text-xs text-slate-400">
+                Are you sure you want to remove <strong>{removingStudent.user.first_name} {removingStudent.user.last_name}</strong> from <strong>{removingStudent.batch?.name}</strong>?
+              </p>
+            </div>
+
+            <form onSubmit={handleRemoveSubmit} className="space-y-4">
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
+                  Optional Removal Remark / Reason
+                </label>
+                <textarea
+                  value={removalRemark}
+                  onChange={(e) => setRemovalRemark(e.target.value)}
+                  placeholder="e.g. Schedule conflict, requested transfer..."
+                  rows={3}
+                  className="w-full p-3 rounded-xl glass-input text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setRemovingStudent(null)}
+                  className="btn-secondary h-10 px-4 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={removalLoading}
+                  className="h-10 px-5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer bg-red-600 hover:bg-red-500 text-white shadow-lg"
+                >
+                  {removalLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  Confirm Removal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: Add Student Profile ── */}
       {showAddModal && (

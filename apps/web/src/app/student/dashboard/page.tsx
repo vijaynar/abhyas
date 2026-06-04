@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@/lib/supabase';
+import CustomSelect from '../../admin/components/CustomSelect';
 import {
   AlertCircle,
   Calendar,
@@ -83,6 +84,43 @@ export default function StudentDashboard() {
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const [fines, setFines] = useState<FineItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Student join request & removals states
+  const [removalNotification, setRemovalNotification] = useState<any | null>(null);
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinBatchId, setJoinBatchId] = useState('');
+  const [joinRemark, setJoinRemark] = useState('');
+  const [submittingJoin, setSubmittingJoin] = useState(false);
+
+  const handleJoinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinBatchId) return;
+    setSubmittingJoin(true);
+    try {
+      const response = await fetch('/api/v1/students/join-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchId: joinBatchId,
+          remark: joinRemark
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to submit join request');
+
+      setShowJoinModal(false);
+      setJoinBatchId('');
+      setJoinRemark('');
+      alert('Join request submitted successfully!');
+      await loadDashboardData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Connection error');
+    } finally {
+      setSubmittingJoin(false);
+    }
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -283,7 +321,25 @@ export default function StudentDashboard() {
 
       setFines((finesData || []) as unknown as FineItem[]);
 
-      // 5. Check if user already applied to become a coach
+      // 5. Fetch removal notifications
+      const { data: removals } = await supabase
+        .from('student_removals')
+        .select('id, remark, removed_at, batch:batches(name)')
+        .eq('student_id', uid)
+        .order('removed_at', { ascending: false });
+
+      setRemovalNotification(removals && removals.length > 0 ? removals[0] : null);
+
+      // 6. Fetch join requests
+      const { data: requests } = await supabase
+        .from('student_join_requests')
+        .select('id, remark, status, created_at, batch:batches(name)')
+        .eq('student_id', uid)
+        .order('created_at', { ascending: false });
+
+      setJoinRequests(requests || []);
+
+      // 7. Check if user already applied to become a coach
       loadCoachStatus(uid);
 
     } catch (err) {
@@ -352,6 +408,7 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    fetchBatches();
   }, []);
 
   // Fetch contextual lists when tabs are switched
@@ -702,6 +759,7 @@ export default function StudentDashboard() {
           </div>
 
           {/* Active Schedule Panel */}
+          {/* Active Schedule Panel / Removal Banner / Unassigned card */}
           {data.student?.batch ? (
             <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
@@ -722,6 +780,30 @@ export default function StudentDashboard() {
                 Active Enrolled
               </span>
             </div>
+          ) : removalNotification ? (
+            <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 glow-red">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-red-400 font-extrabold uppercase tracking-widest block">Class Batch Removal Alert</span>
+                  <h3 className="text-base font-bold text-white mt-0.5">
+                    Removed from batch {removalNotification.batch?.name || 'Class Subject'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Removed on: {new Date(removalNotification.removed_at).toLocaleDateString()}
+                    {removalNotification.remark ? ` • Remark: "${removalNotification.remark}"` : ' • Remark: No remark specified.'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowJoinModal(true)}
+                className="btn-premium h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+              >
+                Request to Join Batch <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ) : (
             <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
@@ -737,10 +819,10 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <button 
-                onClick={() => setActiveTab('batches')}
-                className="btn-premium h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1"
+                onClick={() => setShowJoinModal(true)}
+                className="btn-premium h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
-                Register Class <ArrowRight className="w-3.5 h-3.5" />
+                Request to Join Batch <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -806,86 +888,142 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Right Hand: Outstanding Fines ledger */}
-            <div className="glass-panel p-6 rounded-3xl lg:col-span-2 space-y-6">
-              <div className="border-b border-white/10 pb-3">
-                <h2 className="text-lg font-bold text-white tracking-tight">Payment History & Settlements</h2>
-                <p className="text-[11px] text-slate-400">Clear outstanding penalties with UPI/Bank proof uploads</p>
-              </div>
-
-              <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 no-scrollbar">
-                {fines.length === 0 ? (
-                  <div className="text-center py-12">
-                    <CheckCircle2 className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
-                    <p className="text-xs text-slate-400">No penalties logged!</p>
-                    <p className="text-[10px] text-slate-600 mt-1">Your account balance is completely settled.</p>
+            {/* Right Hand: Join Requests and Fines panels */}
+            <div className="lg:col-span-2 space-y-6 flex flex-col">
+              
+              {/* Submitted Join Requests Widget */}
+              <div className="glass-panel p-6 rounded-3xl space-y-6">
+                <div className="border-b border-white/10 pb-3 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-lg font-bold text-white tracking-tight">Batch Join Requests</h2>
+                    <p className="text-[11px] text-slate-400">Track status of registration requests</p>
                   </div>
-                ) : (
-                  fines.map((fine) => (
-                    <div key={fine.id} className="p-4 rounded-2xl bg-indigo-950/10 border border-indigo-500/15 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase">
-                            Issued: {new Date(fine.issued_date).toLocaleDateString()}
-                          </span>
-                          <h4 className="text-xs font-bold text-slate-200 mt-0.5">{fine.reason}</h4>
-                        </div>
-                        <span className="text-xs font-black text-indigo-300">
-                          ₹{Number(fine.amount).toLocaleString()}
-                        </span>
-                      </div>
+                  <BookOpen className="w-5 h-5 text-indigo-400" />
+                </div>
 
-                      {fine.status === 'unpaid' && fine.rejection_reason && (
-                        <div className="p-2 rounded-xl bg-red-500/5 border border-red-500/20 text-[9px] text-red-400 font-semibold leading-normal">
-                          <strong>Audit Rejection Note:</strong> "{fine.rejection_reason}"
+                <div className="space-y-4 max-h-[220px] overflow-y-auto pr-1 no-scrollbar">
+                  {joinRequests.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-xs text-slate-500 italic">No join requests submitted.</p>
+                    </div>
+                  ) : (
+                    joinRequests.map((req) => (
+                      <div key={req.id} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[9px] text-slate-500 font-semibold block">
+                              Requested: {new Date(req.created_at).toLocaleDateString()}
+                            </span>
+                            <h4 className="text-xs font-bold text-slate-200 mt-0.5">{req.batch?.name || 'Class Subject'}</h4>
+                          </div>
+                          <div>
+                            {req.status === 'pending' && (
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-amber-500/10 text-amber-400 animate-pulse">
+                                Pending
+                              </span>
+                            )}
+                            {req.status === 'approved' && (
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-400">
+                                Approved
+                              </span>
+                            )}
+                            {req.status === 'rejected' && (
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-red-500/10 text-red-400">
+                                Rejected
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                        {fine.status === 'unpaid' ? (
-                          <>
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-amber-500/10 text-amber-400">
-                              Unpaid
-                            </span>
-                            <button
-                              onClick={() => setSubmittingFine(fine)}
-                              className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] cursor-pointer glow-indigo flex items-center gap-1"
-                            >
-                              <Upload className="w-3.5 h-3.5" /> Submit Proof
-                            </button>
-                          </>
-                        ) : fine.status === 'pending_verification' ? (
-                          <>
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-400 animate-pulse">
-                              Pending Audit
-                            </span>
-                            <span className="text-[9px] text-slate-500 italic">
-                              Under manual review
-                            </span>
-                          </>
-                        ) : fine.status === 'paid' ? (
-                          <>
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-400">
-                              Paid
-                            </span>
-                            <span className="text-[9px] text-slate-500 italic">
-                              Settled on {fine.paid_date ? new Date(fine.paid_date).toLocaleDateString() : '-'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-slate-500/10 text-slate-500">
-                              Waived
-                            </span>
-                            <span className="text-[9px] text-slate-500 italic max-w-[120px] truncate" title={fine.waive_reason || ''}>
-                              Reason: "{fine.waive_reason}"
-                            </span>
-                          </>
+                        {req.remark && (
+                          <p className="text-[9px] text-slate-400 italic">"{req.remark}"</p>
                         )}
                       </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Outstanding Fines ledger */}
+              <div className="glass-panel p-6 rounded-3xl space-y-6">
+                <div className="border-b border-white/10 pb-3">
+                  <h2 className="text-lg font-bold text-white tracking-tight">Payment History & Settlements</h2>
+                  <p className="text-[11px] text-slate-400">Clear outstanding penalties with UPI/Bank proof uploads</p>
+                </div>
+
+                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 no-scrollbar">
+                  {fines.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
+                      <p className="text-xs text-slate-400">No penalties logged!</p>
+                      <p className="text-[10px] text-slate-600 mt-1">Your account balance is completely settled.</p>
                     </div>
-                  ))
-                )}
+                  ) : (
+                    fines.map((fine) => (
+                      <div key={fine.id} className="p-4 rounded-2xl bg-indigo-950/10 border border-indigo-500/15 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                              Issued: {new Date(fine.issued_date).toLocaleDateString()}
+                            </span>
+                            <h4 className="text-xs font-bold text-slate-200 mt-0.5">{fine.reason}</h4>
+                          </div>
+                          <span className="text-xs font-black text-indigo-300">
+                            ₹{Number(fine.amount).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {fine.status === 'unpaid' && fine.rejection_reason && (
+                          <div className="p-2 rounded-xl bg-red-500/5 border border-red-500/20 text-[9px] text-red-400 font-semibold leading-normal">
+                            <strong>Audit Rejection Note:</strong> "{fine.rejection_reason}"
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                          {fine.status === 'unpaid' ? (
+                            <>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-amber-500/10 text-amber-400">
+                                Unpaid
+                              </span>
+                              <button
+                                onClick={() => setSubmittingFine(fine)}
+                                className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] cursor-pointer glow-indigo flex items-center gap-1"
+                              >
+                                <Upload className="w-3.5 h-3.5" /> Submit Proof
+                              </button>
+                            </>
+                          ) : fine.status === 'pending_verification' ? (
+                            <>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-400 animate-pulse">
+                                Pending Audit
+                              </span>
+                              <span className="text-[9px] text-slate-500 italic">
+                                Under manual review
+                              </span>
+                            </>
+                          ) : fine.status === 'paid' ? (
+                            <>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-400">
+                                Paid
+                              </span>
+                              <span className="text-[9px] text-slate-500 italic">
+                                Settled on {fine.paid_date ? new Date(fine.paid_date).toLocaleDateString() : '-'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase bg-slate-500/10 text-slate-500">
+                                Waived
+                              </span>
+                              <span className="text-[9px] text-slate-500 italic max-w-[120px] truncate" title={fine.waive_reason || ''}>
+                                Reason: "{fine.waive_reason}"
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1482,6 +1620,83 @@ export default function StudentDashboard() {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ── Modal: Request to Join Batch ── */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md glass-panel p-6 rounded-3xl space-y-5 relative">
+            <button
+              onClick={() => setShowJoinModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold tracking-widest uppercase mb-1">
+                <Sparkles className="w-3.5 h-3.5" /> Batch Enrollment Registry
+              </div>
+              <h3 className="text-lg font-bold text-white">Request to Join Batch</h3>
+              <p className="text-xs text-slate-400">Request registration for an active class batch stream.</p>
+            </div>
+
+            <form onSubmit={handleJoinSubmit} className="space-y-4">
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
+                  Select Class Batch
+                </label>
+                {(() => {
+                  const options = [
+                    { value: '', label: 'Choose class batch...' },
+                    ...batches.map((b: any) => ({
+                      value: b.id,
+                      label: `${b.class?.name || 'Class'} - ${b.name} (${b.start_time.slice(0, 5)} - ${b.end_time.slice(0, 5)})`
+                    }))
+                  ];
+                  return (
+                    <CustomSelect
+                      value={joinBatchId}
+                      onChange={setJoinBatchId}
+                      options={options}
+                      placeholder="Choose class batch..."
+                    />
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wide">
+                  Add Request Note / Remark
+                </label>
+                <textarea
+                  value={joinRemark}
+                  onChange={(e) => setJoinRemark(e.target.value)}
+                  placeholder="e.g. Requesting transfer due to changed scheduling availability..."
+                  rows={3}
+                  className="w-full p-3 rounded-xl glass-input text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowJoinModal(false)}
+                  className="btn-secondary h-10 px-4 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingJoin || !joinBatchId}
+                  className="btn-primary h-10 px-5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer glow-indigo"
+                >
+                  {submittingJoin && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  Submit Request
+                </button>
+              </div>
             </form>
           </div>
         </div>
