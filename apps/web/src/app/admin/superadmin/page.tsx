@@ -31,6 +31,34 @@ import {
   MapPin
 } from 'lucide-react';
 
+const formatRupees = (amount: number) => {
+  if (amount >= 10000000) {
+    return `₹${(amount / 10000000).toFixed(2)} Cr`;
+  }
+  if (amount >= 100000) {
+    return `₹${(amount / 100000).toFixed(2)} L`;
+  }
+  return `₹${amount.toLocaleString('en-IN')}`;
+};
+
+const formatRelativeTime = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  } catch (e) {
+    return '';
+  }
+};
+
 interface TenantItem {
   id: string;
   name: string;
@@ -455,6 +483,31 @@ export default function SuperadminPage() {
     return matchesSearch && matchesState && matchesCity;
   });
 
+  // ── Dynamic SVG Chart Data Calculations ──
+  const maxStudentCount = Math.max(...(growth.studentGrowth || []).map(g => g.count), 1);
+  const studentPoints = (growth.studentGrowth || []).map((g, idx) => {
+    const x = 10 + idx * 44;
+    const y = 95 - (g.count / maxStudentCount) * 75; // leave some top padding
+    return { x, y, ...g };
+  });
+
+  const studentLinePath = studentPoints.length > 0
+    ? `M ${studentPoints.map(p => `${p.x},${p.y}`).join(' L ')}`
+    : '';
+
+  const studentAreaPath = studentPoints.length > 0
+    ? `M ${studentPoints[0].x},95 L ${studentPoints.map(p => `${p.x},${p.y}`).join(' L ')} L ${studentPoints[studentPoints.length - 1].x},95 Z`
+    : '';
+
+  const maxAcademyCount = Math.max(...(growth.academyGrowth || []).map(g => g.count), 1);
+  const academyBars = (growth.academyGrowth || []).map((g, idx) => {
+    const w = 12;
+    const x = 8 + idx * 40;
+    const h = Math.max((g.count / maxAcademyCount) * 85, 2); // min height 2px
+    const y = 95 - h;
+    return { x, y, w, h, ...g };
+  });
+
   return (
     <div className="space-y-8">
       {/* ── Page Header ── */}
@@ -667,7 +720,9 @@ export default function SuperadminPage() {
                 <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
                   <TrendingUp className="w-4.5 h-4.5 text-indigo-400" /> Platform Growth Trends
                 </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">Monthly trajectory of student registrations and onboarded academies</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Monthly trajectory of student registrations and onboarded academies
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
@@ -675,7 +730,7 @@ export default function SuperadminPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-300">Student Growth</span>
-                    <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                    <span className="text-[10px] text-slate-500 font-mono">6-Month Trend</span>
                   </div>
                   
                   <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
@@ -693,27 +748,30 @@ export default function SuperadminPage() {
                         <line x1="0" y1="80" x2="240" y2="80" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
                         
                         {/* Area Gradient fill */}
-                        <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30 L 230,95 L 10,95 Z" fill="url(#studentGrowthGrad)" />
+                        {studentAreaPath && <path d={studentAreaPath} fill="url(#studentGrowthGrad)" />}
                         
                         {/* Line path */}
-                        <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30" fill="none" stroke="#6366f1" strokeWidth="2.5" className="glow-indigo" />
+                        {studentLinePath && <path d={studentLinePath} fill="none" stroke="#6366f1" strokeWidth="2.5" className="glow-indigo" />}
                         
                         {/* Points */}
-                        <circle cx="10" cy="85" r="3" fill="#6366f1" />
-                        <circle cx="54" cy="80" r="3" fill="#6366f1" />
-                        <circle cx="98" cy="71" r="3" fill="#6366f1" />
-                        <circle cx="142" cy="56" r="3" fill="#6366f1" />
-                        <circle cx="186" cy="43" r="3" fill="#6366f1" />
-                        <circle cx="230" cy="30" r="3" fill="#818cf8" className="glow-indigo" />
+                        {studentPoints.map((pt, idx) => (
+                          <circle
+                            key={pt.month}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r="3"
+                            fill={idx === studentPoints.length - 1 ? '#818cf8' : '#6366f1'}
+                            className={idx === studentPoints.length - 1 ? 'glow-indigo' : ''}
+                          />
+                        ))}
                       </svg>
                     </div>
                     <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
-                      <span>Jan (8k)</span>
-                      <span>Feb (8.5k)</span>
-                      <span>Mar (9.2k)</span>
-                      <span>Apr (10.4k)</span>
-                      <span>May (11.5k)</span>
-                      <span>Jun (12.4k)</span>
+                      {studentPoints.map((pt) => (
+                        <span key={pt.month}>
+                          {pt.month} ({pt.count})
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -722,7 +780,7 @@ export default function SuperadminPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-300">Academy Growth</span>
-                    <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                    <span className="text-[10px] text-slate-500 font-mono">6-Month Trend</span>
                   </div>
                   
                   <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
@@ -734,22 +792,29 @@ export default function SuperadminPage() {
                             <stop offset="100%" stopColor="#a855f7" stopOpacity="0.05" />
                           </linearGradient>
                         </defs>
-                        {/* Bars representing Jan (12) to Jun (25) */}
-                        <rect x="8" y="52" width="12" height="43" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
-                        <rect x="48" y="44" width="12" height="51" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
-                        <rect x="88" y="32" width="12" height="63" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
-                        <rect x="128" y="20" width="12" height="75" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
-                        <rect x="168" y="12" width="12" height="83" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
-                        <rect x="208" y="0" width="12" height="95" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#c084fc" strokeWidth="1" className="glow-purple" />
+                        {academyBars.map((bar, idx) => {
+                          const isLast = idx === academyBars.length - 1;
+                          return (
+                            <rect
+                              key={bar.month}
+                              x={bar.x}
+                              y={bar.y}
+                              width={bar.w}
+                              height={bar.h}
+                              rx="2.5"
+                              fill="url(#academyGrowthGrad)"
+                              stroke={isLast ? '#c084fc' : '#a855f7'}
+                              strokeWidth={isLast ? 1 : 0.5}
+                              className={isLast ? 'glow-purple' : ''}
+                            />
+                          );
+                        })}
                       </svg>
                     </div>
                     <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
-                      <span>Jan (12)</span>
-                      <span>Feb (14)</span>
-                      <span>Mar (17)</span>
-                      <span>Apr (20)</span>
-                      <span>May (22)</span>
-                      <span>Jun (25)</span>
+                      {academyBars.map((bar) => (
+                        <span key={bar.month}>{bar.month} ({bar.count})</span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -769,15 +834,15 @@ export default function SuperadminPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
                   <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Monthly</span>
-                  <span className="text-sm font-black text-white mt-1 block">₹12.5 L</span>
+                  <span className="text-sm font-black text-white mt-1 block">{formatRupees(revenue.monthlyCollection)}</span>
                 </div>
                 <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
                   <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Pending</span>
-                  <span className="text-sm font-black text-amber-400 mt-1 block">₹2.2 L</span>
+                  <span className="text-sm font-black text-amber-400 mt-1 block">{formatRupees(revenue.pendingCollection)}</span>
                 </div>
                 <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
                   <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Annual</span>
-                  <span className="text-sm font-black text-indigo-400 mt-1 block">₹1.3 Cr</span>
+                  <span className="text-sm font-black text-indigo-400 mt-1 block">{formatRupees(revenue.annualRevenue)}</span>
                 </div>
               </div>
 
@@ -785,23 +850,32 @@ export default function SuperadminPage() {
               <div className="space-y-2.5 pt-1">
                 <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-widest block">Revenue by Academy</span>
                 
-                {[
-                  { name: 'FitZone', revenue: '₹2.5L', pct: 78, color: 'bg-indigo-500 glow-indigo' },
-                  { name: 'YogaLife', revenue: '₹1.8L', pct: 56, color: 'bg-purple-500 glow-purple' },
-                  { name: 'DanceHub', revenue: '₹3.2L', pct: 100, color: 'bg-emerald-500 glow-emerald' },
-                  { name: 'Apex Martial', revenue: '₹1.5L', pct: 47, color: 'bg-pink-500' },
-                  { name: 'VidyaSopan', revenue: '₹2.95L', pct: 92, color: 'bg-teal-500' }
-                ].map((ac) => (
-                  <div key={ac.name} className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-semibold text-slate-300">
-                      <span>{ac.name}</span>
-                      <span>{ac.revenue}</span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-950/40 rounded-full overflow-hidden border border-white/5">
-                      <div className={`h-full rounded-full transition-all duration-500 ${ac.color}`} style={{ width: `${ac.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
+                {revenue.byAcademy?.length > 0 ? (
+                  revenue.byAcademy.map((ac: any, idx: number) => {
+                    const maxRevenue = Math.max(...revenue.byAcademy.map((item: any) => item.revenue), 1);
+                    const pct = Math.round((ac.revenue / maxRevenue) * 100);
+                    const colors = [
+                      'bg-indigo-500 glow-indigo',
+                      'bg-purple-500 glow-purple',
+                      'bg-emerald-500 glow-emerald',
+                      'bg-pink-500',
+                      'bg-teal-500'
+                    ];
+                    return (
+                      <div key={ac.name} className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-semibold text-slate-300">
+                          <span>{ac.name}</span>
+                          <span>{formatRupees(ac.revenue)}</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-950/40 rounded-full overflow-hidden border border-white/5">
+                          <div className={`h-full rounded-full transition-all duration-500 ${colors[idx % colors.length]}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-500 italic p-2">No academy revenue data.</p>
+                )}
               </div>
             </div>
           </div>
@@ -818,20 +892,24 @@ export default function SuperadminPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { text: '5 Academies have pending fees', type: 'fees', color: 'border-amber-500/20 bg-amber-500/5 text-amber-300 hover:border-amber-500/40' },
-                  { text: '3 Coaches awaiting approval', type: 'coaches', color: 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:border-indigo-500/40' },
-                  { text: '2 Academies have no attendance', type: 'attendance', color: 'border-red-500/20 bg-red-500/5 text-red-300 hover:border-red-500/40' },
-                  { text: '7 Student registrations pending', type: 'students', color: 'border-purple-500/20 bg-purple-500/5 text-purple-300 hover:border-purple-500/40' }
-                ].map((alert, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer ${alert.color}`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-current animate-ping shrink-0" />
-                    <span className="text-xs font-bold leading-normal">{alert.text}</span>
-                  </div>
-                ))}
+                {actionRequired.length > 0 ? (
+                  actionRequired.map((alert, idx) => {
+                    const colorClass = alert.type === 'warning' 
+                      ? 'border-amber-500/20 bg-amber-500/5 text-amber-300 hover:border-amber-500/40'
+                      : 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:border-indigo-500/40';
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer ${colorClass}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-current animate-ping shrink-0" />
+                        <span className="text-xs font-bold leading-normal">{alert.text}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-500 italic p-4">No pending actions required.</p>
+                )}
               </div>
             </div>
 
@@ -845,17 +923,21 @@ export default function SuperadminPage() {
               </div>
 
               <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
-                {recentActivity.map((act) => (
-                  <div key={act.id} className="flex gap-3 text-xs items-start group">
-                    <div className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5 font-bold group-hover:scale-110 transition-transform">
-                      ✓
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((act) => (
+                    <div key={act.id} className="flex gap-3 text-xs items-start group">
+                      <div className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5 font-bold group-hover:scale-110 transition-transform">
+                        ✓
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden flex-1">
+                        <span className="font-semibold text-slate-200 block leading-normal">{act.description}</span>
+                        <span className="text-[10px] text-indigo-400 font-medium block mt-0.5">{formatRelativeTime(act.created_at)}</span>
+                      </div>
                     </div>
-                    <div className="space-y-0.5 overflow-hidden">
-                      <span className="font-extrabold text-slate-200 block truncate">{act.action}</span>
-                      <span className="text-[10px] text-slate-400 block leading-normal">{act.description}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500 italic p-4">No recent activity logs.</p>
+                )}
               </div>
             </div>
           </div>

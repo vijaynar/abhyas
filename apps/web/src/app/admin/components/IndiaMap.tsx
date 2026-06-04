@@ -8,6 +8,8 @@ import 'leaflet/dist/leaflet.css';
 interface MapCityItem {
   city: string;
   count: number;
+  lat?: number;
+  lng?: number;
 }
 
 interface IndiaMapProps {
@@ -60,17 +62,21 @@ export default function IndiaMap({ mapData = [] }: IndiaMapProps) {
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
     }).addTo(map);
 
-    const cities = [
-      { name: 'Delhi', coords: [28.6139, 77.2090] as [number, number], defaultCount: 6 },
-      { name: 'Mumbai', coords: [19.0760, 72.8777] as [number, number], defaultCount: 7 },
-      { name: 'Pune', coords: [18.5204, 73.8567] as [number, number], defaultCount: 4 },
-      { name: 'Hyderabad', coords: [17.3850, 78.4867] as [number, number], defaultCount: 8 }
-    ];
+    const markersToRender = (mapData && mapData.length > 0)
+      ? mapData.map((item) => ({
+          name: item.city,
+          coords: [item.lat || 20.5937, item.lng || 78.9629] as [number, number],
+          count: item.count
+        }))
+      : [
+          { name: 'Delhi', coords: [28.6139, 77.2090] as [number, number], count: 6 },
+          { name: 'Mumbai', coords: [19.0760, 72.8777] as [number, number], count: 7 },
+          { name: 'Pune', coords: [18.5204, 73.8567] as [number, number], count: 4 },
+          { name: 'Hyderabad', coords: [17.3850, 78.4867] as [number, number], count: 8 }
+        ];
 
     // Add city markers with standard high-clarity white labels as requested
-    cities.forEach((city) => {
-      const count = getCityCount(city.name, city.defaultCount);
-      
+    markersToRender.forEach((city) => {
       const markerHtml = `
         <div class="relative flex items-center justify-center pointer-events-auto" style="width: 24px; height: 24px;">
           <!-- Solid Circular Dot with Outer Halo -->
@@ -80,7 +86,7 @@ export default function IndiaMap({ mapData = [] }: IndiaMapProps) {
           </div>
           <!-- High-Clarity Label Badge -->
           <div class="absolute top-[-28px] left-[50%] translate-x-[-50%] border border-slate-300/80 bg-white rounded px-1.5 py-0.5 text-[8px] font-extrabold font-sans tracking-wide whitespace-nowrap z-25 shadow select-none" style="color: #1e293b; font-family: sans-serif;">
-            ${city.name.toUpperCase()}: ${count}
+            ${city.name.toUpperCase()}: ${city.count}
           </div>
         </div>
       `;
