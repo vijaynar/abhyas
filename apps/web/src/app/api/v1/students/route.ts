@@ -58,9 +58,12 @@ export async function GET(req: Request) {
         `,
         { count: 'exact' }
       )
-      .eq('tenant_id', ctx.tenantId)
       .range(offset, offset + limit - 1)
       .order('created_at', { ascending: false });
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -108,10 +111,11 @@ export async function POST(req: Request) {
     const {
       email, password, firstName, lastName, phone,
       studentCustomId, dateOfBirth, joiningDate,
-      batchId, address, emergencyContact,
-    } = parsed.data;
+      batchId, address, emergencyContact, tenantId
+    } = parsed.data as any;
 
     const db = adminDb();
+    const effectiveTenantId = ctx.role === 'superadmin' ? (tenantId || ctx.tenantId) : ctx.tenantId;
 
     // Generate Custom ID (Roll Number) automatically if not provided
     let customId = studentCustomId?.trim();
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
       const { data: lastStudent, error: lastStudentErr } = await db
         .from('students')
         .select('student_custom_id')
-        .eq('tenant_id', ctx.tenantId)
+        .eq('tenant_id', effectiveTenantId)
         .like('student_custom_id', 'vs%')
         .order('student_custom_id', { ascending: false })
         .limit(1);
@@ -145,12 +149,14 @@ export async function POST(req: Request) {
 
     // Validate batch belongs to tenant if provided
     if (batchId) {
-      const { data: batch } = await db
+      const batchQuery = db
         .from('batches')
         .select('id')
-        .eq('id', batchId)
-        .eq('tenant_id', ctx.tenantId)
-        .single();
+        .eq('id', batchId);
+      if (ctx.role !== 'superadmin') {
+        batchQuery.eq('tenant_id', effectiveTenantId);
+      }
+      const { data: batch } = await batchQuery.single();
       if (!batch) return err('Batch not found in your tenant', 404);
     }
 
@@ -173,7 +179,7 @@ export async function POST(req: Request) {
         email: authEmail,
         password: finalPassword,
         email_confirm: true,
-        app_metadata: { tenant_id: ctx.tenantId, role: 'student' },
+        app_metadata: { tenant_id: effectiveTenantId, role: 'student' },
         user_metadata: { first_name: firstName, last_name: lastName },
       });
 
@@ -189,7 +195,7 @@ export async function POST(req: Request) {
     // 2. Insert users profile row
     const { error: userErr } = await db.from('users').insert({
       id: userId,
-      tenant_id: ctx.tenantId,
+      tenant_id: effectiveTenantId,
       email,
       role: 'student',
       first_name: firstName,
@@ -207,7 +213,7 @@ export async function POST(req: Request) {
       .from('students')
       .insert({
         id: userId,
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         batch_id: batchId ?? null,
         student_custom_id: customId,
         date_of_birth: dateOfBirth,

@@ -19,8 +19,11 @@ export async function GET(req: Request) {
         *,
         class:classes(id, name)
       `)
-      .eq('tenant_id', ctx.tenantId)
       .order('name', { ascending: true });
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     if (classId) {
       query = query.eq('class_id', classId);
@@ -48,14 +51,20 @@ export async function POST(req: Request) {
     const db = adminDb();
 
     // Verify the class belongs to this tenant
-    const { data: cls, error: clsErr } = await db
+    const classQuery = db
       .from('classes')
-      .select('id')
-      .eq('id', parsed.data.classId)
-      .eq('tenant_id', ctx.tenantId)
-      .single();
+      .select('id, tenant_id')
+      .eq('id', parsed.data.classId);
+
+    if (ctx.role !== 'superadmin') {
+      classQuery.eq('tenant_id', ctx.tenantId);
+    }
+
+    const { data: cls, error: clsErr } = await classQuery.maybeSingle();
 
     if (clsErr || !cls) return err('Class not found in your tenant', 404);
+
+    const effectiveTenantId = cls.tenant_id;
 
     // Validate end_time > start_time at application level
     const [sh, sm] = parsed.data.startTime.split(':').map(Number);
@@ -67,7 +76,7 @@ export async function POST(req: Request) {
     const { data, error } = await db
       .from('batches')
       .insert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         class_id: parsed.data.classId,
         name: parsed.data.name,
         start_time: `${parsed.data.startTime}:00`,
@@ -83,7 +92,7 @@ export async function POST(req: Request) {
     // If a coach creates a batch, auto-create a pending assignment for them
     if (ctx.role === 'coach') {
       await db.from('coach_batch_assignments').insert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         coach_id: ctx.userId,
         batch_id: data.id,
         status: 'pending',

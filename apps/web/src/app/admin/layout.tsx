@@ -185,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(isAdmin && hasPermission('roles', 'manage') ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
     ...(isAdmin && hasPermission('users', 'view') ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
     ...(isAdmin && hasPermission('audit_logs', 'view') ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
-    ...(isAdmin && hasPermission('portal', 'manage')
+    ...(isAdmin && hasPermission('settings', 'manage')
       ? [{
           name: profile?.role === 'superadmin' ? 'Global Settings' : 'Academy Settings',
           href: '/admin/settings',

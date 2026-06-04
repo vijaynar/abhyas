@@ -15,13 +15,17 @@ export async function POST(req: Request) {
 
     const db = adminDb();
 
-    // 1. Fetch student current profile
-    const { data: student, error: getErr } = await db
+    // 1. Fetch student current profile (unless superadmin)
+    const studentQuery = db
       .from('students')
       .select('id, batch_id, tenant_id')
-      .eq('id', studentId)
-      .eq('tenant_id', ctx.tenantId)
-      .maybeSingle();
+      .eq('id', studentId);
+
+    if (ctx.role !== 'superadmin') {
+      studentQuery.eq('tenant_id', ctx.tenantId);
+    }
+
+    const { data: student, error: getErr } = await studentQuery.maybeSingle();
 
     if (getErr) throw getErr;
     if (!student) {
@@ -33,6 +37,7 @@ export async function POST(req: Request) {
     }
 
     const oldBatchId = student.batch_id;
+    const effectiveTenantId = student.tenant_id;
 
     // 2. Clear batch_id on student profile
     const { error: updateErr } = await db
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
     const { error: logErr } = await db
       .from('student_removals')
       .insert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         student_id: studentId,
         batch_id: oldBatchId,
         remark: remark || null,

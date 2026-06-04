@@ -46,9 +46,12 @@ export async function GET(req: Request) {
         `,
         { count: 'exact' }
       )
-      .eq('tenant_id', ctx.tenantId)
       .order('issued_date', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     // Role-based data scoping
     if (ctx.role === 'student') {
@@ -112,20 +115,21 @@ export async function POST(req: Request) {
     const { studentId, amount, reason } = parsed.data;
     const db = adminDb();
 
-    // Verify student belongs to tenant
-    const { data: student } = await db
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .eq('tenant_id', ctx.tenantId)
-      .single();
+    // Verify student belongs to tenant (unless superadmin)
+    const studentQuery = db.from('students').select('id, tenant_id').eq('id', studentId);
+    if (ctx.role !== 'superadmin') {
+      studentQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: student } = await studentQuery.maybeSingle();
 
     if (!student) return err('Student not found in your tenant', 404);
+
+    const effectiveTenantId = student.tenant_id;
 
     const { data: fine, error } = await db
       .from('fines')
       .insert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         student_id: studentId,
         amount,
         reason,

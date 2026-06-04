@@ -82,6 +82,28 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 
   if (error || !user) return null;
 
+  // Query public.users directly to get the active role and tenant_id
+  try {
+    const db = adminDb();
+    const { data: dbUser } = await db
+      .from('users')
+      .select('role, tenant_id, email')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (dbUser && dbUser.role && dbUser.tenant_id) {
+      return {
+        userId: user.id,
+        tenantId: dbUser.tenant_id,
+        role: dbUser.role,
+        email: dbUser.email ?? user.email ?? '',
+      };
+    }
+  } catch (err) {
+    console.error('[getAuthContext DB Query Error]:', err);
+  }
+
+  // Fallback to JWT app_metadata (e.g. during onboarding / first login)
   const tenantId = user.app_metadata?.tenant_id as string | undefined;
   const role = user.app_metadata?.role as string | undefined;
 

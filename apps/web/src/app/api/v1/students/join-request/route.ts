@@ -17,8 +17,11 @@ export async function GET(req: Request) {
           user:users(first_name, last_name, email)
         )
       `)
-      .eq('tenant_id', ctx.tenantId)
       .order('created_at', { ascending: false });
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     // Students can only see their own requests
     if (ctx.role === 'student') {

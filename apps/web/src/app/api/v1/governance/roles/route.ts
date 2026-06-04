@@ -20,11 +20,12 @@ export async function GET(req: Request) {
       .order('action');
     if (permErr) throw permErr;
 
-    // Fetch roles scoped to this tenant + global system roles
-    const { data: roles, error: rolesErr } = await db
-      .from('roles')
-      .select('*')
-      .or(`tenant_id.eq.${ctx.tenantId},tenant_id.is.null`)
+    // Fetch roles scoped to this tenant + global system roles (or all if superadmin)
+    const rolesQuery = db.from('roles').select('*');
+    if (ctx.role !== 'superadmin') {
+      rolesQuery.or(`tenant_id.eq.${ctx.tenantId},tenant_id.is.null`);
+    }
+    const { data: roles, error: rolesErr } = await rolesQuery
       .order('is_system', { ascending: false })
       .order('name');
     if (rolesErr) throw rolesErr;
@@ -129,13 +130,19 @@ export async function PUT(req: Request) {
 
     const db = adminDb();
 
-    // Verify role exists and is not locked out
-    const { data: role, error: roleErr } = await db
-      .from('roles')
-      .select('*')
-      .eq('id', roleId)
-      .single();
-    if (roleErr || !role) return err('Role not found.', 404);
+    // Verify role exists and is not locked out (scoped to tenant unless superadmin)
+    const roleQuery = db.from('roles').select('*').eq('id', roleId);
+    if (ctx.role !== 'superadmin') {
+      roleQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: role, error: roleErr } = await roleQuery.maybeSingle();
+
+    if (roleErr || !role) return err('Role not found or access denied.', 404);
+    if (ctx.role !== 'superadmin') {
+      if (role.is_system || role.tenant_id !== ctx.tenantId) {
+        return err('Forbidden: you cannot modify system roles or roles from other tenants.', 403);
+      }
+    }
     if (role.name === 'Super Admin') return err('Super Admin permissions cannot be modified.', 403);
 
     // Resolve permission IDs

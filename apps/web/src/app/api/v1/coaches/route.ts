@@ -40,8 +40,11 @@ export async function GET(req: Request) {
             class:classes(name)
           )
         )
-      `)
-      .eq('tenant_id', ctx.tenantId);
+      `);
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     if (!includeInactive) {
       query = query.eq('is_active', true);
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
       qualification, certificationsSummary, joiningDate, bio,
       country, state, city, area,
       salaryType, fixedSalary, perClassRate, revenueSharePct,
-      bankAccountNumber, bankIfscCode, bankName, upiId, panNumber
+      bankAccountNumber, bankIfscCode, bankName, upiId, panNumber, tenantId
     } = body;
 
     if (!email || !password || !firstName || !lastName || !primarySkill || experienceYears === undefined) {
@@ -77,13 +80,14 @@ export async function POST(req: Request) {
     }
 
     const db = adminDb();
+    const effectiveTenantId = ctx.role === 'superadmin' ? (tenantId || ctx.tenantId) : ctx.tenantId;
 
     // 1. Create Supabase auth user
     const { data: authData, error: authError } = await db.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      app_metadata: { tenant_id: ctx.tenantId, role: 'coach' },
+      app_metadata: { tenant_id: effectiveTenantId, role: 'coach' },
       user_metadata: { first_name: firstName, last_name: lastName },
     });
 
@@ -99,7 +103,7 @@ export async function POST(req: Request) {
     // 2. Insert users profile row (Coaches require admin document verification before activation)
     const { error: userErr } = await db.from('users').insert({
       id: userId,
-      tenant_id: ctx.tenantId,
+      tenant_id: effectiveTenantId,
       email,
       role: 'coach',
       first_name: firstName,
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
       .from('coaches')
       .insert({
         id: userId,
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         primary_skill: primarySkill,
         experience_years: Number(experienceYears),
         service_types: serviceTypes ?? ['Offline'],
@@ -154,7 +158,7 @@ export async function POST(req: Request) {
     // 4. Insert coach financial settings
     const { error: finErr } = await db.from('coach_financial_settings').insert({
       coach_id: userId,
-      tenant_id: ctx.tenantId,
+      tenant_id: effectiveTenantId,
       salary_type: salaryType ?? 'Fixed Monthly',
       fixed_salary: fixedSalary ? Number(fixedSalary) : 0.00,
       per_class_rate: perClassRate ? Number(perClassRate) : 0.00,
@@ -173,8 +177,6 @@ export async function POST(req: Request) {
       await db.auth.admin.deleteUser(userId);
       throw finErr;
     }
-
-    // 5. Create default empty availability entries if needed (can be customized later)
 
     return created({ userId, coach });
   } catch (e: unknown) {
@@ -200,21 +202,30 @@ export async function PUT(req: Request) {
       return err('Forbidden: coaches can only update their own profile', 403);
     }
 
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coachProfile, error: coachProfileErr } = await coachQuery.maybeSingle();
+    if (coachProfileErr || !coachProfile) {
+      return err('Coach not found in your tenant', 404);
+    }
+    const effectiveTenantId = coachProfile.tenant_id;
+
     // Action: deactivate — admin only
     if (action === 'deactivate') {
       if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
       const { error: userErr } = await db
         .from('users')
         .update({ is_active: false })
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (userErr) throw userErr;
 
       const { error: coachErr } = await db
         .from('coaches')
         .update({ employment_status: 'Inactive' })
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (coachErr) throw coachErr;
 
       return ok({ success: true, message: 'Coach deactivated' });
@@ -244,13 +255,12 @@ export async function PUT(req: Request) {
       const { error: userErr } = await db
         .from('users')
         .update({ is_active: true, role: 'coach' })
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (userErr) throw userErr;
 
       // Update role to 'coach' in Supabase Auth user metadata
       const { error: authErr } = await db.auth.admin.updateUserById(coachId, {
-        app_metadata: { role: 'coach', tenant_id: ctx.tenantId }
+        app_metadata: { role: 'coach', tenant_id: effectiveTenantId }
       });
       if (authErr) {
         console.warn('[Coach Approval] Auth metadata update warning:', authErr.message);
@@ -259,8 +269,7 @@ export async function PUT(req: Request) {
       const { error: coachErr } = await db
         .from('coaches')
         .update({ employment_status: 'Active' })
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (coachErr) throw coachErr;
 
       return ok({ success: true, message: 'Coach activated and marked active.' });
@@ -290,8 +299,7 @@ export async function PUT(req: Request) {
       const { error: coachErr } = await db
         .from('coaches')
         .update(coachUpdate)
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (coachErr) throw coachErr;
     }
 
@@ -313,8 +321,7 @@ export async function PUT(req: Request) {
         const { error: finErr } = await db
           .from('coach_financial_settings')
           .update(finUpdate)
-          .eq('coach_id', coachId)
-          .eq('tenant_id', ctx.tenantId);
+          .eq('coach_id', coachId);
         if (finErr) throw finErr;
       }
     }
@@ -332,8 +339,7 @@ export async function PUT(req: Request) {
       const { error: userErr } = await db
         .from('users')
         .update(userUpdate)
-        .eq('id', coachId)
-        .eq('tenant_id', ctx.tenantId);
+        .eq('id', coachId);
       if (userErr) throw userErr;
     }
 

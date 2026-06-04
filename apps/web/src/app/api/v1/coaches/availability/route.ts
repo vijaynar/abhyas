@@ -21,11 +21,22 @@ export async function GET(req: Request) {
     }
 
     const db = adminDb();
+
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     const { data: slots, error } = await db
       .from('coach_availability')
       .select('*')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
 
@@ -56,6 +67,16 @@ export async function POST(req: Request) {
 
     const db = adminDb();
 
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     // Validate slots before performing transaction
     for (const slot of slots) {
       const { dayOfWeek, startTime, endTime } = slot;
@@ -73,7 +94,7 @@ export async function POST(req: Request) {
       .from('coach_availability')
       .delete()
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId);
+      .eq('tenant_id', effectiveTenantId);
 
     if (delErr) throw delErr;
 
@@ -81,7 +102,7 @@ export async function POST(req: Request) {
     if (slots.length > 0) {
       const inserts = slots.map(slot => ({
         coach_id: coachId,
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         day_of_week: slot.dayOfWeek,
         start_time: slot.startTime,
         end_time: slot.endTime,

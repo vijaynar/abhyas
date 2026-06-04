@@ -28,8 +28,11 @@ export async function GET(req: Request) {
         ),
         requested_by_user:requested_by(first_name, last_name),
         approved_by_user:approved_by(first_name, last_name)
-      `)
-      .eq('tenant_id', ctx.tenantId);
+      `);
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     if (batchId) query = query.eq('batch_id', batchId);
     if (coachId) query = query.eq('coach_id', coachId);
@@ -73,13 +76,31 @@ export async function POST(req: Request) {
       return err('Coaches can only request assignments for themselves', 403);
     }
 
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    // Verify batch belongs to tenant (unless superadmin)
+    const batchQuery = db.from('batches').select('id, tenant_id').eq('id', batchId);
+    if (ctx.role !== 'superadmin') {
+      batchQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: batch, error: batchErr } = await batchQuery.maybeSingle();
+    if (batchErr || !batch) return err('Batch not found in your tenant', 404);
+
+    const effectiveTenantId = batch.tenant_id;
+
     // Admins get 'approved' instantly; coaches get 'pending'
     const status = hasRole(ctx, 'admin', 'superadmin') ? 'approved' : 'pending';
 
     const { data, error } = await db
       .from('coach_batch_assignments')
       .upsert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         coach_id: coachId,
         batch_id: batchId,
         status,
@@ -121,6 +142,14 @@ export async function PUT(req: Request) {
 
     const db = adminDb();
 
+    // Verify assignment belongs to tenant (unless superadmin)
+    const assignQuery = db.from('coach_batch_assignments').select('id, tenant_id').eq('id', assignmentId);
+    if (ctx.role !== 'superadmin') {
+      assignQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: assignment, error: assignErr } = await assignQuery.maybeSingle();
+    if (assignErr || !assignment) return err('Assignment not found in your tenant', 404);
+
     const updatePayload: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
@@ -136,7 +165,6 @@ export async function PUT(req: Request) {
       .from('coach_batch_assignments')
       .update(updatePayload)
       .eq('id', assignmentId)
-      .eq('tenant_id', ctx.tenantId)
       .select()
       .single();
 
@@ -162,12 +190,23 @@ export async function DELETE(req: Request) {
 
     const db = adminDb();
 
+    // Verify assignment exists and belongs to tenant (unless superadmin)
+    const assignQuery = db
+      .from('coach_batch_assignments')
+      .select('id, tenant_id')
+      .eq('coach_id', coachId)
+      .eq('batch_id', batchId);
+
+    if (ctx.role !== 'superadmin') {
+      assignQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: assignment, error: assignErr } = await assignQuery.maybeSingle();
+    if (assignErr || !assignment) return err('Assignment not found in your tenant', 404);
+
     const { error } = await db
       .from('coach_batch_assignments')
       .delete()
-      .eq('coach_id', coachId)
-      .eq('batch_id', batchId)
-      .eq('tenant_id', ctx.tenantId);
+      .eq('id', assignment.id);
 
     if (error) throw error;
 

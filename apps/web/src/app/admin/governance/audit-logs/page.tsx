@@ -19,7 +19,7 @@ const SEVERITY = (action: string): { color: string; bg: string } => {
   return { color: 'bg-indigo-400', bg: 'bg-indigo-400/10' };
 };
 
-const MODULES = ['students','coaches','attendance','payments','reports','users','roles','portal','audit_logs'];
+const MODULES = ['students','coaches','attendance','payments','reports','users','roles','settings','audit_logs'];
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -92,7 +92,7 @@ export default function AuditLogsPage() {
             className="h-9 pl-8 pr-4 rounded-xl glass-input text-xs font-bold appearance-none cursor-pointer min-w-[140px]">
             <option value="">All Modules</option>
             {MODULES.map(m => {
-              const label = m === 'portal' ? 'Settings' : m.charAt(0).toUpperCase() + m.slice(1);
+              const label = m === 'audit_logs' ? 'Audit Logs' : m.charAt(0).toUpperCase() + m.slice(1);
               return <option key={m} value={m}>{label}</option>;
             })}
           </select>
@@ -128,7 +128,7 @@ export default function AuditLogsPage() {
                           sev.color === 'bg-emerald-400' ? 'text-emerald-400' :
                           sev.color === 'bg-amber-400' ? 'text-amber-400' : 'text-indigo-400'
                         }`}>{act ?? log.action}</span>
-                        <span className="text-[9px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded-full">{mod === 'portal' ? 'settings' : mod}</span>
+                        <span className="text-[9px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded-full">{mod}</span>
                       </div>
                       <p className="text-xs text-slate-300 leading-relaxed">{log.description}</p>
                     </div>

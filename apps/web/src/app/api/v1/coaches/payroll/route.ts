@@ -21,11 +21,22 @@ export async function GET(req: Request) {
     }
 
     const db = adminDb();
+
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     const { data: payouts, error } = await db
       .from('coach_payouts')
       .select('*')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .order('period_start', { ascending: false });
 
     if (error) throw error;
@@ -50,12 +61,22 @@ export async function POST(req: Request) {
 
     const db = adminDb();
 
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     // 1. Fetch coach financial settings
     const { data: settings, error: setErr } = await db
       .from('coach_financial_settings')
       .select('*')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .single();
 
     if (setErr || !settings) {
@@ -67,7 +88,7 @@ export async function POST(req: Request) {
       .from('coach_attendance')
       .select('status')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .gte('date', periodStart)
       .lte('date', periodEnd);
 
@@ -94,7 +115,7 @@ export async function POST(req: Request) {
       const { data: sessions, error: sessErr } = await db
         .from('attendance_logs')
         .select('batch_id, date')
-        .eq('tenant_id', ctx.tenantId)
+        .eq('tenant_id', effectiveTenantId)
         .in('batch_id', batchIds)
         .gte('date', periodStart)
         .lte('date', periodEnd);
@@ -154,7 +175,7 @@ export async function POST(req: Request) {
       .from('coach_payouts')
       .select('id')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .eq('period_start', periodStart)
       .eq('period_end', periodEnd)
       .in('status', ['Draft', 'Processing'])
@@ -185,7 +206,7 @@ export async function POST(req: Request) {
         .from('coach_payouts')
         .insert({
           coach_id: coachId,
-          tenant_id: ctx.tenantId,
+          tenant_id: effectiveTenantId,
           period_start: periodStart,
           period_end: periodEnd,
           base_salary_earned: baseSalaryEarned,

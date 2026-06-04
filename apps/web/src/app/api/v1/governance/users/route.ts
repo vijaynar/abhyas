@@ -94,6 +94,17 @@ export async function PUT(req: Request) {
     if (!userId) return err('userId is required.', 422);
 
     const db = adminDb();
+
+    // Verify user belongs to tenant (unless superadmin)
+    const userQuery = db.from('users').select('id, tenant_id').eq('id', userId);
+    if (ctx.role !== 'superadmin') {
+      userQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: userRecord, error: userRecordErr } = await userQuery.maybeSingle();
+    if (userRecordErr || !userRecord) {
+      return err('User not found or access denied.', 404);
+    }
+
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (role !== undefined) updates.role = role;
     if (roleId !== undefined) updates.role_id = roleId;
@@ -102,11 +113,7 @@ export async function PUT(req: Request) {
     if (phone !== undefined) updates.phone = phone;
     if (isActive !== undefined) updates.is_active = isActive;
 
-    let updateQuery = db.from('users').update(updates).eq('id', userId);
-    if (ctx.role !== 'superadmin') {
-      updateQuery = updateQuery.eq('tenant_id', ctx.tenantId);
-    }
-    const { error: updateErr } = await updateQuery;
+    const { error: updateErr } = await db.from('users').update(updates).eq('id', userId);
     if (updateErr) throw updateErr;
 
     if (role) {
@@ -136,14 +143,18 @@ export async function DELETE(req: Request) {
 
     const db = adminDb();
 
-    const { data: targetUser } = await db.from('users').select('first_name, last_name, email, role').eq('id', userId).single();
+    // Verify user belongs to tenant (unless superadmin)
+    const userQuery = db.from('users').select('id, tenant_id, first_name, last_name, email, role').eq('id', userId);
+    if (ctx.role !== 'superadmin') {
+      userQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: targetUser, error: userRecordErr } = await userQuery.maybeSingle();
+    if (userRecordErr || !targetUser) {
+      return err('User not found or access denied.', 404);
+    }
 
     // Soft-delete: deactivate rather than hard delete
-    let deleteQuery = db.from('users').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', userId);
-    if (ctx.role !== 'superadmin') {
-      deleteQuery = deleteQuery.eq('tenant_id', ctx.tenantId);
-    }
-    await deleteQuery;
+    await db.from('users').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', userId);
     await db.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
 
     await logAuditEvent(

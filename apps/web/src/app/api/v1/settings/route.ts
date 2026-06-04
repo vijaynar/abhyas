@@ -68,7 +68,7 @@ export async function PATCH(req: Request) {
     if (!ctx) return err('Unauthorised', 401);
     
     // Check permission dynamically from database
-    if (!await hasPermission(ctx, 'portal', 'manage')) {
+    if (!await hasPermission(ctx, 'settings', 'manage')) {
       return err('Forbidden', 403);
     }
 

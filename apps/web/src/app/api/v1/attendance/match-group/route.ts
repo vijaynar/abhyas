@@ -27,22 +27,27 @@ export async function POST(req: Request) {
 
     const db = adminDb();
 
-    // 1. Validate batch belongs to tenant
-    const { data: batch, error: batchErr } = await db
+    // 1. Validate batch belongs to tenant (unless superadmin)
+    const batchQuery = db
       .from('batches')
       .select('id, name, start_time, tenant_id, is_active')
-      .eq('id', batchId)
-      .eq('tenant_id', ctx.tenantId)
-      .single();
+      .eq('id', batchId);
+
+    if (ctx.role !== 'superadmin') {
+      batchQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: batch, error: batchErr } = await batchQuery.maybeSingle();
 
     if (batchErr || !batch) return err('Batch not found in your tenant', 404);
     if (!batch.is_active) return err('Batch is not active', 422);
+
+    const effectiveTenantId = batch.tenant_id;
 
     // 2. Get all students enrolled in this batch
     const { data: enrolledStudents, error: enrollErr } = await db
       .from('students')
       .select('id, student_custom_id, users!inner(first_name, last_name, email)')
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .eq('batch_id', batchId);
 
     if (enrollErr) throw enrollErr;
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
       .select(
         'grace_period_minutes, late_threshold_minutes, auto_fine_enabled, absent_fine_rule_1, absent_fine_rule_1_days, absent_fine_rule_2'
       )
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .single();
 
     const gracePeriod = settings?.grace_period_minutes ?? 0;
@@ -152,7 +157,7 @@ export async function POST(req: Request) {
         const { data: matches, error: matchErr } = await db.rpc(
           'match_face_embedding',
           {
-            p_tenant_id: ctx.tenantId,
+            p_tenant_id: effectiveTenantId,
             input_embedding: embeddingLiteral,
             match_threshold: 0.60, // slightly more lenient for group photos
             match_count: 1,
@@ -203,7 +208,7 @@ export async function POST(req: Request) {
           .from('attendance_logs')
           .upsert(
             {
-              tenant_id: ctx.tenantId,
+              tenant_id: effectiveTenantId,
               student_id: match.studentId,
               batch_id: batchId,
               date,
@@ -254,7 +259,7 @@ export async function POST(req: Request) {
           .from('attendance_logs')
           .upsert(
             {
-              tenant_id: ctx.tenantId,
+              tenant_id: effectiveTenantId,
               student_id: student.id,
               batch_id: batchId,
               date,
@@ -290,7 +295,7 @@ export async function POST(req: Request) {
           const { count: absenceCount } = await db
             .from('attendance_logs')
             .select('id', { count: 'exact', head: true })
-            .eq('tenant_id', ctx.tenantId)
+            .eq('tenant_id', effectiveTenantId)
             .eq('student_id', student.id)
             .eq('status', 'absent')
             .gte('date', monthStart)
@@ -310,7 +315,7 @@ export async function POST(req: Request) {
 
           if ((existingFines ?? 0) === 0) {
             const { error: fineErr } = await db.from('fines').insert({
-              tenant_id: ctx.tenantId,
+              tenant_id: effectiveTenantId,
               student_id: student.id,
               attendance_log_id: log.id,
               amount: fineAmount,

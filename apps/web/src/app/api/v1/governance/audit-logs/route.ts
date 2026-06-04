@@ -20,9 +20,12 @@ export async function GET(req: Request) {
     let query = db
       .from('audit_logs')
       .select('*, users(first_name, last_name, email, role)', { count: 'exact' })
-      .eq('tenant_id', ctx.tenantId)
       .order('created_at', { ascending: false })
       .range(from, to);
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     if (module) query = query.ilike('action', `${module}.%`);
     if (userId) query = query.eq('user_id', userId);

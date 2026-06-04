@@ -22,11 +22,22 @@ export async function GET(req: Request) {
     }
 
     const db = adminDb();
+
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     const { data: docs, error } = await db
       .from('coach_documents')
       .select('*')
       .eq('coach_id', coachId)
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -55,11 +66,22 @@ export async function POST(req: Request) {
     }
 
     const db = adminDb();
+
+    // Verify coach belongs to tenant (unless superadmin)
+    const coachQuery = db.from('users').select('id, tenant_id').eq('id', coachId).eq('role', 'coach');
+    if (ctx.role !== 'superadmin') {
+      coachQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: coach, error: coachErr } = await coachQuery.maybeSingle();
+    if (coachErr || !coach) return err('Coach not found in your tenant', 404);
+
+    const effectiveTenantId = coach.tenant_id;
+
     const { data: doc, error } = await db
       .from('coach_documents')
       .insert({
         coach_id: coachId,
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         document_type: documentType,
         document_name: documentName,
         file_url: fileUrl,
@@ -94,6 +116,15 @@ export async function PUT(req: Request) {
     }
 
     const db = adminDb();
+
+    // Verify document belongs to tenant (unless superadmin)
+    const docQuery = db.from('coach_documents').select('id, tenant_id').eq('id', documentId);
+    if (ctx.role !== 'superadmin') {
+      docQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: docRecord, error: docRecordErr } = await docQuery.maybeSingle();
+    if (docRecordErr || !docRecord) return err('Document not found in your tenant', 404);
+
     const { data: doc, error } = await db
       .from('coach_documents')
       .update({
@@ -104,7 +135,6 @@ export async function PUT(req: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', documentId)
-      .eq('tenant_id', ctx.tenantId)
       .select()
       .single();
 

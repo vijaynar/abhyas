@@ -46,10 +46,13 @@ export async function GET(req: Request) {
         `,
         { count: 'exact' }
       )
-      .eq('tenant_id', ctx.tenantId)
       .order('date', { ascending: false })
       .order('check_in', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
 
     // Students can only see their own records
     if (ctx.role === 'student') {
@@ -109,21 +112,31 @@ export async function POST(req: Request) {
     const { studentId, batchId, date, status, notes } = parsed.data;
     const db = adminDb();
 
-    // Verify student and batch belong to this tenant
+    // Verify student and batch belong to this tenant (unless superadmin)
+    const studentQuery = db.from('students').select('id, tenant_id').eq('id', studentId);
+    const batchQuery = db.from('batches').select('id, tenant_id').eq('id', batchId);
+
+    if (ctx.role !== 'superadmin') {
+      studentQuery.eq('tenant_id', ctx.tenantId);
+      batchQuery.eq('tenant_id', ctx.tenantId);
+    }
+
     const [{ data: student }, { data: batch }] = await Promise.all([
-      db.from('students').select('id').eq('id', studentId).eq('tenant_id', ctx.tenantId).single(),
-      db.from('batches').select('id').eq('id', batchId).eq('tenant_id', ctx.tenantId).single(),
+      studentQuery.maybeSingle(),
+      batchQuery.maybeSingle(),
     ]);
 
     if (!student) return err('Student not found in your tenant', 404);
     if (!batch) return err('Batch not found in your tenant', 404);
+
+    const effectiveTenantId = student.tenant_id;
 
     // Upsert: update if record exists, insert if not
     const { data: log, error } = await db
       .from('attendance_logs')
       .upsert(
         {
-          tenant_id: ctx.tenantId,
+          tenant_id: effectiveTenantId,
           student_id: studentId,
           batch_id: batchId,
           date,
@@ -143,7 +156,7 @@ export async function POST(req: Request) {
 
     // Auto-fine: if marking absent and auto_fine_enabled
     if (status === 'absent') {
-      await createAbsenceFineIfEnabled(ctx.tenantId, studentId, log.id, date, db);
+      await createAbsenceFineIfEnabled(effectiveTenantId, studentId, log.id, date, db);
     }
 
     return created(log);
@@ -151,6 +164,7 @@ export async function POST(req: Request) {
     return err(e instanceof Error ? e.message : 'Internal server error', 500);
   }
 }
+
 
 // ── Fine helper ───────────────────────────────────────────────
 

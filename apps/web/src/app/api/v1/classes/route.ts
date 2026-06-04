@@ -10,11 +10,16 @@ export async function GET() {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
 
-    const { data, error } = await adminDb()
+    let query = adminDb()
       .from('classes')
       .select('*')
-      .eq('tenant_id', ctx.tenantId)
       .order('name', { ascending: true });
+
+    if (ctx.role !== 'superadmin') {
+      query = query.eq('tenant_id', ctx.tenantId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return ok(data);
@@ -34,11 +39,12 @@ export async function POST(req: Request) {
     if (!parsed.success) return err(parsed.error.errors[0].message, 422);
 
     const db = adminDb();
+    const effectiveTenantId = ctx.role === 'superadmin' ? (body.tenantId || ctx.tenantId) : ctx.tenantId;
 
     const { data, error } = await db
       .from('classes')
       .insert({
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         name: parsed.data.name,
         description: parsed.data.description ?? null,
       })

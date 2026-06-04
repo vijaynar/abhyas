@@ -20,12 +20,16 @@ export async function PATCH(
     const db = adminDb();
 
     // 1. Fetch the request
-    const { data: request, error: fetchErr } = await db
+    const requestQuery = db
       .from('student_join_requests')
       .select('*')
-      .eq('id', id)
-      .eq('tenant_id', ctx.tenantId)
-      .single();
+      .eq('id', id);
+
+    if (ctx.role !== 'superadmin') {
+      requestQuery.eq('tenant_id', ctx.tenantId);
+    }
+
+    const { data: request, error: fetchErr } = await requestQuery.maybeSingle();
 
     if (fetchErr || !request) {
       return err('Join request not found', 404);

@@ -37,17 +37,23 @@ export async function POST(req: Request) {
 
     const db = adminDb();
 
-    // Verify student belongs to this tenant
-    const { data: student, error: studentErr } = await db
+    // Verify student belongs to this tenant (unless superadmin)
+    const studentQuery = db
       .from('students')
       .select('id, tenant_id')
-      .eq('id', studentId)
-      .eq('tenant_id', ctx.tenantId)
-      .single();
+      .eq('id', studentId);
+
+    if (ctx.role !== 'superadmin') {
+      studentQuery.eq('tenant_id', ctx.tenantId);
+    }
+
+    const { data: student, error: studentErr } = await studentQuery.maybeSingle();
 
     if (studentErr || !student) {
       return err('Student not found in your tenant', 404);
     }
+
+    const effectiveTenantId = student.tenant_id;
 
     // Check max samples per student (limit to 5 to keep vectors focused)
     const { count } = await db
@@ -69,7 +75,7 @@ export async function POST(req: Request) {
       .from('student_face_samples')
       .insert({
         student_id: studentId,
-        tenant_id: ctx.tenantId,
+        tenant_id: effectiveTenantId,
         photo_url: photoUrl,
         embedding: embeddingLiteral as unknown as number[],
         label: label ?? null,
@@ -105,11 +111,20 @@ export async function DELETE(req: Request) {
 
     const db = adminDb();
 
+    // Verify sample exists and belongs to this tenant (unless superadmin)
+    const sampleQuery = db.from('student_face_samples').select('id, tenant_id').eq('id', sampleId);
+    if (ctx.role !== 'superadmin') {
+      sampleQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { data: sample, error: sampleErr } = await sampleQuery.maybeSingle();
+    if (sampleErr || !sample) {
+      return err('Face sample not found in your tenant', 404);
+    }
+
     const { error } = await db
       .from('student_face_samples')
       .delete()
-      .eq('id', sampleId)
-      .eq('tenant_id', ctx.tenantId); // tenant isolation
+      .eq('id', sampleId); // tenant isolation
 
     if (error) throw error;
 
