@@ -2,13 +2,13 @@
 // POST /api/v1/governance/roles  — Create custom role
 // PUT  /api/v1/governance/roles  — Update role permissions
 
-import { getAuthContext, adminDb, ok, err, created, logAuditEvent } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, created, logAuditEvent, hasPermission } from '@/lib/api';
 
 export async function GET(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'roles', 'manage')) return err('Forbidden', 403);
 
     const db = adminDb();
 
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'roles', 'manage')) return err('Forbidden', 403);
 
     const { name, assignedPermissions } = await req.json();
     if (!name || !Array.isArray(assignedPermissions)) {
@@ -120,7 +120,7 @@ export async function PUT(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'roles', 'manage')) return err('Forbidden', 403);
 
     const { roleId, assignedPermissions } = await req.json();
     if (!roleId || !Array.isArray(assignedPermissions)) {

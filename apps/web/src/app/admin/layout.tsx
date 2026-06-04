@@ -35,10 +35,19 @@ interface UserProfile {
   first_name: string;
   last_name: string;
   role: string;
+  available_roles: string[];
   tenants: {
     name: string;
     slug: string;
   };
+  roles?: {
+    role_permissions: Array<{
+      permissions: {
+        module: string;
+        action: string;
+      } | null;
+    }>;
+  } | null;
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -60,10 +69,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        // Fetch user profile and joined tenant info
+        // Fetch user profile, joined tenant info, and permissions
         const { data: userProfile, error: dbError } = await supabase
           .from('users')
-          .select('id, email, first_name, last_name, role, tenants(name, slug)')
+          .select(`
+            id,
+            email,
+            first_name,
+            last_name,
+            role,
+            available_roles,
+            tenants(name, slug),
+            roles(
+              role_permissions(
+                permissions(
+                  module,
+                  action
+                )
+              )
+            )
+          `)
           .eq('id', user.id)
           .single();
 
@@ -95,32 +120,73 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.refresh();
   };
 
+  const handleSwitchRole = async (targetRole: string) => {
+    try {
+      const res = await fetch('/api/v1/users/switch-role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: targetRole }),
+      });
+      if (res.ok) {
+        if (targetRole === 'student' || targetRole === 'parent') {
+          window.location.href = '/student/dashboard';
+        } else {
+          window.location.href = '/admin/dashboard';
+        }
+      } else {
+        console.error('Failed to switch role:', await res.text());
+      }
+    } catch (err) {
+      console.error('Error switching role:', err);
+    }
+  };
+
   const isCoach = profile?.role === 'coach';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
+  const hasPermission = (module: string, action: string) => {
+    if (!profile) return false;
+    if (profile.role === 'superadmin') return true;
+    const rolesObj: any = profile.roles;
+    const rolePermissions = Array.isArray(rolesObj)
+      ? rolesObj[0]?.role_permissions
+      : rolesObj?.role_permissions;
+    if (!rolePermissions) return false;
+    return rolePermissions.some((rp: any) => {
+      const p = rp.permissions;
+      return p && p.module === module && p.action === action;
+    });
+  };
+
   const topItems = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Attendance', href: '/admin/attendance', icon: FileText },
+    ...(hasPermission('attendance', 'view') ? [{ name: 'Attendance', href: '/admin/attendance', icon: FileText }] : []),
     ...(isCoach ? [{ name: 'My Profile', href: '/admin/profile', icon: User }] : []),
   ];
 
   const manageItems = [
-    { name: 'Batches', href: '/admin/batches', icon: Calendar },
-    ...(isAdmin ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
-    { name: 'Students', href: '/admin/students', icon: Users },
+    ...(hasPermission('batches', 'view') ? [{ name: 'Batches', href: '/admin/batches', icon: Calendar }] : []),
+    ...(isAdmin && hasPermission('coaches', 'view') ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
+    ...(hasPermission('students', 'view') ? [{ name: 'Students', href: '/admin/students', icon: Users }] : []),
   ];
 
   const accountsItems = [
-    { name: 'Fines & Payments', href: '/admin/fines', icon: IndianRupee },
-    { name: 'Reports', href: '/admin/reports', icon: BarChart2 },
+    ...(hasPermission('payments', 'view') ? [{ name: 'Fines & Payments', href: '/admin/fines', icon: IndianRupee }] : []),
+    ...(hasPermission('reports', 'view') ? [{ name: 'Reports', href: '/admin/reports', icon: BarChart2 }] : []),
   ];
 
   const adminItems = [
     ...(profile?.role === 'superadmin' ? [{ name: 'Academies', href: '/admin/superadmin', icon: ShieldAlert }] : []),
-    ...(isAdmin ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
-    ...(isAdmin ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
-    ...(isAdmin ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
-    ...(isAdmin ? [{ name: 'Global Settings', href: '/admin/settings', icon: Settings }] : []),
+    ...(isAdmin && hasPermission('roles', 'manage') ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
+    ...(isAdmin && hasPermission('users', 'view') ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
+    ...(isAdmin && hasPermission('audit_logs', 'view') ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
+    ...(isAdmin && hasPermission('portal', 'manage')
+      ? [{
+          name: profile?.role === 'superadmin' ? 'Global Settings' : 'Academy Settings',
+          href: '/admin/settings',
+          icon: Settings
+        }]
+      : []),
   ];
 
   const renderNavItem = (item: { name: string; href: string; icon: any }) => {
@@ -289,9 +355,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <h5 className="text-xs font-bold text-slate-200 truncate">
                 {profile.first_name} {profile.last_name}
               </h5>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 mt-0.5">
-                {profile.role}
-              </span>
+              {profile.available_roles && profile.available_roles.length > 1 ? (
+                <div className="mt-1">
+                  <select
+                    value={profile.role}
+                    onChange={(e) => handleSwitchRole(e.target.value)}
+                    className="bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/30 text-indigo-300 text-[10px] font-extrabold rounded-lg px-2 py-0.5 uppercase tracking-wider outline-none cursor-pointer transition-colors duration-200"
+                  >
+                    {profile.available_roles.map((r) => (
+                      <option key={r} value={r} className="bg-[#0f111a] text-slate-300 uppercase">
+                        {r === 'superadmin' ? 'Super Admin' : r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 mt-0.5">
+                  {profile.role}
+                </span>
+              )}
             </div>
           </div>
 
@@ -300,7 +382,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="w-full h-10 rounded-xl border border-red-500/10 hover:border-red-500/30 bg-red-500/5 hover:bg-red-500/10 text-red-400 hover:text-red-300 font-semibold text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            End Admin Session
+            {profile.role === 'coach' 
+              ? 'End Coach Session' 
+              : profile.role === 'superadmin' 
+              ? 'End Super Admin Session' 
+              : 'End Admin Session'}
           </button>
         </div>
       </aside>

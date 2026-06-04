@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState('INR');
   const [weekends, setWeekends] = useState<number[]>([6, 7]);
   const [holidays, setHolidays] = useState<string[]>([]);
+  const [role, setRole] = useState<string>('');
   
   // Custom new holiday date picker input state
   const [newHoliday, setNewHoliday] = useState('');
@@ -120,6 +121,24 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    async function fetchRole() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          if (profile) {
+            setRole(profile.role);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching role in settings:', err);
+      }
+    }
+    fetchRole();
     loadSettings();
   }, []);
 
@@ -201,13 +220,15 @@ export default function SettingsPage() {
       {/* Title Header */}
       <div>
         <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
-          <Sparkles className="w-4 h-4" /> System Governance
+          <Sparkles className="w-4 h-4" /> {role === 'superadmin' ? 'System Governance' : 'Academy Governance'}
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">
-          Academy Rules & Settings
+        <h1 className="text-3xl font-extrabold tracking-tight text-white animate-in fade-in slide-in-from-top-4 duration-300">
+          {role === 'superadmin' ? 'Global Rules & Settings' : 'Academy Rules & Settings'}
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Configure check-in boundaries, calendar schedules, and automatic absentee fine tiers.
+          {role === 'superadmin'
+            ? 'Configure system-wide fallback check-in boundaries, default calendar schedules, and automatic absentee fine tiers.'
+            : 'Configure check-in boundaries, calendar schedules, and automatic absentee fine tiers for this academy.'}
         </p>
       </div>
 
@@ -460,7 +481,7 @@ export default function SettingsPage() {
             ) : (
               <Save className="w-4 h-4" />
             )}
-            Save Governance Policies
+            {role === 'superadmin' ? 'Save Global Policies' : 'Save Academy Policies'}
           </button>
         </div>
 

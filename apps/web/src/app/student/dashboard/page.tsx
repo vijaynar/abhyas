@@ -171,6 +171,7 @@ export default function StudentDashboard() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ id: string; first_name: string; last_name: string; avatar_url: string | null } | null>(null);
+  const [noStudentProfile, setNoStudentProfile] = useState(false);
 
   const supabase = createBrowserClient();
 
@@ -256,9 +257,27 @@ export default function StudentDashboard() {
           )
         `)
         .eq('id', uid)
-        .single();
+        .maybeSingle();
 
       if (stuErr) throw stuErr;
+
+      if (!studentProfile) {
+        setNoStudentProfile(true);
+        // Also fetch user profile for avatar
+        const { data: userRec } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, avatar_url, tenant_id')
+          .eq('id', uid)
+          .single();
+        if (userRec) {
+          setUserProfile(userRec);
+          setPhotoUrl(userRec.avatar_url);
+          setTenantId(userRec.tenant_id);
+        }
+        setLoading(false);
+        return;
+      }
+      setNoStudentProfile(false);
       setTenantId(studentProfile.tenant_id);
 
       // Also fetch user profile for avatar
@@ -611,6 +630,23 @@ export default function StudentDashboard() {
         <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
         <p className="text-slate-400 text-xs font-semibold tracking-widest uppercase">
           Compiling student ledger stats...
+        </p>
+      </div>
+    );
+  }
+
+  if (noStudentProfile) {
+    return (
+      <div className="max-w-md mx-auto mt-12 p-8 rounded-3xl bg-amber-500/5 border border-amber-500/20 text-center space-y-4 shadow-2xl backdrop-blur-md">
+        <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-white">No Student Profile Registered</h2>
+        <p className="text-slate-400 text-xs leading-relaxed">
+          You are currently accessing the **Student Portal**, but no student profile was found for your account ({userProfile?.first_name} {userProfile?.last_name}).
+        </p>
+        <p className="text-slate-500 text-[11px] leading-relaxed">
+          If you have multiple roles (like Coach or Admin), you can switch back using the switcher dropdown in the top-right header workspace menu. Otherwise, please contact your administrator to associate a student ID with your account.
         </p>
       </div>
     );

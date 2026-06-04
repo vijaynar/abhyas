@@ -1,12 +1,12 @@
 // GET /api/v1/governance/audit-logs — Paginated audit trail for current tenant
 
-import { getAuthContext, adminDb, ok, err } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, hasPermission } from '@/lib/api';
 
 export async function GET(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'audit_logs', 'view')) return err('Forbidden', 403);
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') ?? '1');

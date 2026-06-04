@@ -3,13 +3,13 @@
 // PUT    /api/v1/governance/users  — Update user role or profile
 // DELETE /api/v1/governance/users  — Deactivate/remove a user
 
-import { getAuthContext, adminDb, ok, err, created, logAuditEvent } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, created, logAuditEvent, hasPermission } from '@/lib/api';
 
 export async function GET(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'users', 'view')) return err('Forbidden', 403);
 
     const db = adminDb();
     let query = db
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'users', 'create')) return err('Forbidden', 403);
 
     const { email, password, firstName, lastName, phone, role, roleId } = await req.json();
     if (!email || !password || !firstName || !lastName || !role) {
@@ -88,7 +88,7 @@ export async function PUT(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'users', 'edit')) return err('Forbidden', 403);
 
     const { userId, role, roleId, firstName, lastName, phone, isActive } = await req.json();
     if (!userId) return err('userId is required.', 422);
@@ -102,7 +102,11 @@ export async function PUT(req: Request) {
     if (phone !== undefined) updates.phone = phone;
     if (isActive !== undefined) updates.is_active = isActive;
 
-    const { error: updateErr } = await db.from('users').update(updates).eq('id', userId).eq('tenant_id', ctx.tenantId);
+    let updateQuery = db.from('users').update(updates).eq('id', userId);
+    if (ctx.role !== 'superadmin') {
+      updateQuery = updateQuery.eq('tenant_id', ctx.tenantId);
+    }
+    const { error: updateErr } = await updateQuery;
     if (updateErr) throw updateErr;
 
     if (role) {
@@ -124,7 +128,7 @@ export async function DELETE(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!['admin', 'superadmin'].includes(ctx.role)) return err('Forbidden', 403);
+    if (!await hasPermission(ctx, 'users', 'delete')) return err('Forbidden', 403);
 
     const { userId } = await req.json();
     if (!userId) return err('userId is required.', 422);
@@ -135,7 +139,11 @@ export async function DELETE(req: Request) {
     const { data: targetUser } = await db.from('users').select('first_name, last_name, email, role').eq('id', userId).single();
 
     // Soft-delete: deactivate rather than hard delete
-    await db.from('users').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', userId).eq('tenant_id', ctx.tenantId);
+    let deleteQuery = db.from('users').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', userId);
+    if (ctx.role !== 'superadmin') {
+      deleteQuery = deleteQuery.eq('tenant_id', ctx.tenantId);
+    }
+    await deleteQuery;
     await db.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
 
     await logAuditEvent(

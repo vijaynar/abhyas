@@ -20,6 +20,7 @@ interface StudentProfile {
   first_name: string;
   last_name: string;
   role: string;
+  available_roles: string[];
   tenants: {
     name: string;
   };
@@ -44,7 +45,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         // Fetch user profile and joined tenant info
         const { data: userProfile, error: dbError } = await supabase
           .from('users')
-          .select('id, email, first_name, last_name, role, tenants(name)')
+          .select('id, email, first_name, last_name, role, available_roles, tenants(name)')
           .eq('id', user.id)
           .single();
 
@@ -74,6 +75,27 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     await supabase.auth.signOut();
     router.push('/auth/login');
     router.refresh();
+  };
+
+  const handleSwitchRole = async (targetRole: string) => {
+    try {
+      const res = await fetch('/api/v1/users/switch-role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: targetRole }),
+      });
+      if (res.ok) {
+        if (targetRole === 'student' || targetRole === 'parent') {
+          window.location.href = '/student/dashboard';
+        } else {
+          window.location.href = '/admin/dashboard';
+        }
+      } else {
+        console.error('Failed to switch role:', await res.text());
+      }
+    } catch (err) {
+      console.error('Error switching role:', err);
+    }
   };
 
   if (loading) {
@@ -149,7 +171,23 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               <h5 className="text-xs font-bold text-slate-200">
                 {profile.first_name} {profile.last_name}
               </h5>
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">{profile.role}</span>
+              {profile.available_roles && profile.available_roles.length > 1 ? (
+                <div className="mt-0.5">
+                  <select
+                    value={profile.role}
+                    onChange={(e) => handleSwitchRole(e.target.value)}
+                    className="bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/30 text-indigo-300 text-[10px] font-extrabold rounded-lg px-2 py-0.5 uppercase tracking-wider outline-none cursor-pointer transition-colors duration-200"
+                  >
+                    {profile.available_roles.map((r) => (
+                      <option key={r} value={r} className="bg-[#0f111a] text-slate-300 uppercase">
+                        {r === 'superadmin' ? 'Super Admin' : r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="text-[9px] text-slate-500 uppercase font-semibold">{profile.role}</span>
+              )}
             </div>
           </div>
 

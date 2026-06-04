@@ -2,7 +2,7 @@
 // GET  /api/v1/settings        — get tenant configuration
 // PATCH /api/v1/settings       — update tenant configuration (admin only)
 
-import { getAuthContext, adminDb, ok, err, hasRole } from '@/lib/api';
+import { getAuthContext, adminDb, ok, err, hasPermission } from '@/lib/api';
 import { UpdateTenantSettingsSchema } from '@upasthiti/common';
 
 export async function GET() {
@@ -10,18 +10,40 @@ export async function GET() {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
 
-    const { data, error } = await adminDb()
+    const db = adminDb();
+    const targetTenantId = ctx.role === 'superadmin' 
+      ? '00000000-0000-0000-0000-000000000000' 
+      : ctx.tenantId;
+
+    // 1. Fetch active settings for the target tenant
+    let { data, error } = await db
       .from('tenant_settings')
       .select('*')
-      .eq('tenant_id', ctx.tenantId)
+      .eq('tenant_id', targetTenantId)
       .maybeSingle();
 
     if (error) throw error;
 
-    // Return defaults if no settings row exists yet
+    // 2. If not found and the caller is an Admin, load the Global System Defaults
+    if (!data && targetTenantId !== '00000000-0000-0000-0000-000000000000') {
+      const { data: globalDefaults, error: globalErr } = await db
+        .from('tenant_settings')
+        .select('*')
+        .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (!globalErr && globalDefaults) {
+        data = {
+          ...globalDefaults,
+          tenant_id: ctx.tenantId
+        };
+      }
+    }
+
+    // 3. Fallback defaults if no settings record exists in database
     if (!data) {
       return ok({
-        tenant_id: ctx.tenantId,
+        tenant_id: targetTenantId,
         absent_fine_rule_1: 1000,
         absent_fine_rule_1_days: 4,
         absent_fine_rule_2: 2000,
@@ -44,20 +66,27 @@ export async function PATCH(req: Request) {
   try {
     const ctx = await getAuthContext();
     if (!ctx) return err('Unauthorised', 401);
-    if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
+    
+    // Check permission dynamically from database
+    if (!await hasPermission(ctx, 'portal', 'manage')) {
+      return err('Forbidden', 403);
+    }
 
     const body = await req.json();
     const parsed = UpdateTenantSettingsSchema.safeParse(body);
     if (!parsed.success) return err(parsed.error.errors[0].message, 422);
 
     const db = adminDb();
+    const targetTenantId = ctx.role === 'superadmin' 
+      ? '00000000-0000-0000-0000-000000000000' 
+      : ctx.tenantId;
 
-    // Upsert settings — creates the row if it doesn't exist
+    // Upsert settings scoped to targetTenantId
     const { data, error } = await db
       .from('tenant_settings')
       .upsert(
         {
-          tenant_id: ctx.tenantId,
+          tenant_id: targetTenantId,
           ...(parsed.data.absentFineRule1 !== undefined && {
             absent_fine_rule_1: parsed.data.absentFineRule1,
           }),

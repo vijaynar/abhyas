@@ -53,11 +53,11 @@ export async function GET(req: Request) {
 
     if (tenantsErr) throw tenantsErr;
 
-    // 4. Fetch linked tenant owner admin emails (includes superadmin users who own a tenant)
+    // 4. Fetch linked tenant owner admin emails (includes users who are admins/superadmins or have admin/superadmin in available_roles)
     const { data: admins, error: adminsErr } = await db
       .from('users')
       .select('tenant_id, email, first_name, last_name, phone, alternate_phone')
-      .in('role', ['admin', 'superadmin']);
+      .or('role.in.(admin,superadmin),available_roles.cs.{"admin"},available_roles.cs.{"superadmin"}');
 
     if (adminsErr) throw adminsErr;
 

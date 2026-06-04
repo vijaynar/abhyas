@@ -103,6 +103,51 @@ export function hasRole(ctx: AuthContext, ...roles: string[]): boolean {
 }
 
 /**
+ * Check if the user has the specified dynamic permission in the database.
+ * Returns true if superadmin or user's role has the permission mapped.
+ */
+export async function hasPermission(
+  ctx: AuthContext,
+  module: string,
+  action: string
+): Promise<boolean> {
+  if (ctx.role === 'superadmin') return true;
+
+  try {
+    const db = adminDb();
+    const { data: userProfile, error } = await db
+      .from('users')
+      .select(`
+        roles(
+          role_permissions(
+            permissions(
+              module,
+              action
+            )
+          )
+        )
+      `)
+      .eq('id', ctx.userId)
+      .single();
+
+    const rolesObj: any = userProfile?.roles;
+    if (error || !rolesObj) return false;
+    const rolePermissions = Array.isArray(rolesObj)
+      ? rolesObj[0]?.role_permissions
+      : rolesObj?.role_permissions;
+    if (!rolePermissions) return false;
+
+    return rolePermissions.some((rp: any) => {
+      const p = rp.permissions;
+      return p && p.module === module && p.action === action;
+    });
+  } catch (err) {
+    console.error('[hasPermission Check Error]:', err);
+    return false;
+  }
+}
+
+/**
  * Write an operational audit log entry to public.audit_logs.
  * Call this after any significant create/update/delete action.
  */

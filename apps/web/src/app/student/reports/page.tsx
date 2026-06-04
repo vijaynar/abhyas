@@ -52,6 +52,7 @@ export default function StudentReportsPage() {
   const [weekends, setWeekends] = useState<number[]>([6, 7]); // Default Sat=6, Sun=7
   const [holidays, setHolidays] = useState<string[]>([]);
   const [studentCustomId, setStudentCustomId] = useState<string>('');
+  const [noStudentProfile, setNoStudentProfile] = useState(false);
 
   const supabase = createBrowserClient();
 
@@ -66,15 +67,21 @@ export default function StudentReportsPage() {
       const userId = user.id;
 
       // 1. Fetch Student Profile Custom ID
-      const { data: profile } = await supabase
+      const { data: profile, error: profErr } = await supabase
         .from('students')
         .select('student_custom_id')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
-      if (profile) {
-        setStudentCustomId(profile.student_custom_id);
+      if (profErr) throw profErr;
+
+      if (!profile) {
+        setNoStudentProfile(true);
+        setLoading(false);
+        return;
       }
+      setNoStudentProfile(false);
+      setStudentCustomId(profile.student_custom_id);
 
       // 2. Fetch Tenant Settings for Weekend and Holidays
       const settingsRes = await fetch('/api/v1/settings');
@@ -261,6 +268,19 @@ export default function StudentReportsPage() {
           <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
           <p className="text-slate-400 text-xs font-semibold tracking-widest uppercase">
             Compiling monthly reporting metrics...
+          </p>
+        </div>
+      ) : noStudentProfile ? (
+        <div className="max-w-md mx-auto mt-12 p-8 rounded-3xl bg-amber-500/5 border border-amber-500/20 text-center space-y-4 shadow-2xl backdrop-blur-md">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-white">No Student Profile Registered</h2>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            You are currently accessing the **Student Portal**, but no student profile was found for your account.
+          </p>
+          <p className="text-slate-500 text-[11px] leading-relaxed">
+            If you have multiple roles (like Coach or Admin), you can switch back using the switcher dropdown in the top-right header workspace menu. Otherwise, please contact your administrator to associate a student ID with your account.
           </p>
         </div>
       ) : (
