@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import {
   AlertCircle,
@@ -56,6 +57,7 @@ interface StudentDropdownItem {
 }
 
 export default function FinesPage() {
+  const router = useRouter();
   const [fines, setFines] = useState<FineItem[]>([]);
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,11 +96,15 @@ export default function FinesPage() {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       if (!profile) return;
+      if (profile.role === 'superadmin') {
+        router.replace('/admin/dashboard');
+        return;
+      }
 
       const { data: stuData } = await supabase
         .from('students')
@@ -121,11 +127,15 @@ export default function FinesPage() {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       if (!profile) return;
+      if (profile.role === 'superadmin') {
+        router.replace('/admin/dashboard');
+        return;
+      }
       const tenantId = profile.tenant_id;
 
       // 1. First fetch stats summary for header (all outstanding and paid)

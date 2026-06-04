@@ -91,7 +91,10 @@ export default function AuditLogsPage() {
           <select value={moduleFilter} onChange={e => { setModuleFilter(e.target.value); setPage(1); }}
             className="h-9 pl-8 pr-4 rounded-xl glass-input text-xs font-bold appearance-none cursor-pointer min-w-[140px]">
             <option value="">All Modules</option>
-            {MODULES.map(m => <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
+            {MODULES.map(m => {
+              const label = m === 'portal' ? 'Settings' : m.charAt(0).toUpperCase() + m.slice(1);
+              return <option key={m} value={m}>{label}</option>;
+            })}
           </select>
         </div>
         <span className="h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-slate-400 text-xs font-semibold flex items-center">
@@ -125,7 +128,7 @@ export default function AuditLogsPage() {
                           sev.color === 'bg-emerald-400' ? 'text-emerald-400' :
                           sev.color === 'bg-amber-400' ? 'text-amber-400' : 'text-indigo-400'
                         }`}>{act ?? log.action}</span>
-                        <span className="text-[9px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded-full">{mod}</span>
+                        <span className="text-[9px] text-slate-500 font-mono bg-white/5 px-2 py-0.5 rounded-full">{mod === 'portal' ? 'settings' : mod}</span>
                       </div>
                       <p className="text-xs text-slate-300 leading-relaxed">{log.description}</p>
                     </div>

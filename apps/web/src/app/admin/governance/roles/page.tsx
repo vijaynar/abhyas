@@ -34,7 +34,7 @@ const MODULES = [
   { key: 'payments',   label: 'Payments'    },
   { key: 'reports',    label: 'Reports'     },
   { key: 'users',      label: 'Users'       },
-  { key: 'portal',     label: 'Portal'      },
+  { key: 'portal',     label: 'Settings'    },
   { key: 'roles',      label: 'Roles'       },
   { key: 'audit_logs', label: 'Audit Logs'  },
 ];

@@ -141,6 +141,10 @@ function GroupScanContent() {
           .single();
 
         if (!profile) return;
+        if (profile.role === 'superadmin') {
+          router.replace('/admin/dashboard');
+          return;
+        }
 
         let batchData;
         if (profile.role === 'coach') {

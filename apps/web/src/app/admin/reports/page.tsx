@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import {
   Calendar as CalendarIcon,
@@ -63,6 +64,7 @@ interface FineItem {
 }
 
 export default function AdminReportsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'batch' | 'student'>('batch');
   const [loading, setLoading] = useState(true);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -119,6 +121,10 @@ export default function AdminReportsPage() {
           .single();
         if (profile) {
           role = profile.role ?? '';
+          if (role === 'superadmin') {
+            router.replace('/admin/dashboard');
+            return;
+          }
           setUserRole(role);
         }
       }

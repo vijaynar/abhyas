@@ -92,6 +92,10 @@ export default function AttendanceLogsPage() {
         .single();
 
       if (!profile) return;
+      if (profile.role === 'superadmin') {
+        router.replace('/admin/dashboard');
+        return;
+      }
       setUserRole(profile.role ?? '');
 
       let batchData;

@@ -146,7 +146,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const hasPermission = (module: string, action: string) => {
     if (!profile) return false;
-    if (profile.role === 'superadmin') return true;
+    if (profile.role === 'superadmin') {
+      if (module === 'attendance' || module === 'payments' || module === 'reports') {
+        return false;
+      }
+      return true;
+    }
     const rolesObj: any = profile.roles;
     const rolePermissions = Array.isArray(rolesObj)
       ? rolesObj[0]?.role_permissions
