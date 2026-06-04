@@ -271,10 +271,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="overflow-hidden">
             <h4 className="text-xs font-bold text-slate-300 truncate tracking-wide">
-              {profile.tenants.name}
+              {profile.role === 'superadmin' ? 'Upasthiti Platform' : profile.tenants.name}
             </h4>
             <p className="text-[10px] text-slate-500 truncate">
-              {profile.tenants.slug}.upasthiti.app
+              {profile.role === 'superadmin' ? 'platform.upasthiti.app' : `${profile.tenants.slug}.upasthiti.app`}
             </p>
           </div>
         </div>

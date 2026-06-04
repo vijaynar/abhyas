@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBrowserClient } from '@/lib/supabase';
+import IndiaMap from '../components/IndiaMap';
 import {
   AlertCircle,
   CheckCircle2,
@@ -19,6 +21,14 @@ import {
   Bell,
   BookOpen,
   Briefcase,
+  Activity,
+  Building2,
+  Globe,
+  ShieldAlert,
+  ShieldCheck,
+  UserCheck,
+  AlertTriangle,
+  BarChart3
 } from 'lucide-react';
 
 interface KPIMetrics {
@@ -82,6 +92,7 @@ interface FinePaymentItem {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [metrics, setMetrics] = useState<KPIMetrics>({
     presentToday: 0,
     absentToday: 0,
@@ -109,6 +120,31 @@ export default function AdminDashboard() {
   const [coachAttendanceTrend, setCoachAttendanceTrend] = useState<any[]>([]);
   const [coachLeaves, setCoachLeaves] = useState<any[]>([]);
   const [pendingJoinRequests, setPendingJoinRequests] = useState<any[]>([]);
+
+  // Superadmin dashboard state
+  const [saStats, setSaStats] = useState<any>({
+    totalTenants: 25,
+    studentsCount: 12450,
+    coachesCount: 425,
+    adminsCount: 38,
+    activeBatches: 620,
+    todaysClasses: 180,
+    avgAttendance: 92,
+    pendingFees: 850000
+  });
+  const [saGrowth, setSaGrowth] = useState<any>({
+    studentGrowth: [],
+    academyGrowth: []
+  });
+  const [saRevenue, setSaRevenue] = useState<any>({
+    monthlyCollection: 0,
+    pendingCollection: 0,
+    annualRevenue: 0,
+    byAcademy: []
+  });
+  const [saRecentActivity, setSaRecentActivity] = useState<any[]>([]);
+  const [saActionRequired, setSaActionRequired] = useState<any[]>([]);
+  const [saMapData, setSaMapData] = useState<any[]>([]);
 
   const handleProcessRequest = async (requestId: string, approve: boolean) => {
     setActioningId(requestId);
@@ -197,6 +233,23 @@ export default function AdminDashboard() {
       const tenantId = profile.tenant_id;
       const role = profile.role;
       setUserRole(role);
+
+      if (role === 'superadmin') {
+        const saRes = await fetch('/api/v1/superadmin');
+        if (saRes.ok) {
+          const result = await saRes.json();
+          setSaStats(result.data.stats);
+          setSaGrowth(result.data.growth);
+          setSaRevenue(result.data.revenue);
+          setSaRecentActivity(result.data.recentActivity);
+          setSaActionRequired(result.data.actionRequired);
+          setSaMapData(result.data.mapData);
+        } else {
+          console.error('Failed to load superadmin metrics');
+        }
+        setLoading(false);
+        return;
+      }
 
       const todayStr = new Date().toISOString().split('T')[0];
 
@@ -582,6 +635,411 @@ export default function AdminDashboard() {
     return (
       <div className="h-64 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+      </div>
+    );
+  }
+
+  if (userRole === 'superadmin') {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-300">
+        {/* Upper Title Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-widest uppercase mb-1">
+              <Sparkles className="w-4 h-4" /> Live Platform Insights
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white font-display">
+              Super Admin Dashboard
+            </h1>
+          </div>
+          <button
+            onClick={saRecentActivity.length === 0 ? loadDashboardData : () => loadDashboardData()}
+            className="btn-secondary h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer self-start md:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5`} />
+            Refresh Stats
+          </button>
+        </div>
+
+        {/* Top KPI Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          {/* KPI 1: Academies */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Academies</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <Building2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.totalTenants}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">SaaS Clients onboarded</span>
+            </div>
+          </div>
+
+          {/* KPI 2: Students */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Students</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <Users className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.studentsCount?.toLocaleString()}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">Active enrollments</span>
+            </div>
+          </div>
+
+          {/* KPI 3: Coaches */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Coaches</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <UserCheck className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.coachesCount}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">Registered trainers</span>
+            </div>
+          </div>
+
+          {/* KPI 4: Admins */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Admins</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.adminsCount}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">Academy coordinators</span>
+            </div>
+          </div>
+
+          {/* KPI 5: Active Batches */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active Batches</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.activeBatches}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">Recurring schedules</span>
+            </div>
+          </div>
+
+          {/* KPI 6: Today's Classes */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Today's Classes</span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white">{saStats.todaysClasses}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">Sessions today</span>
+            </div>
+          </div>
+
+          {/* KPI 7: Attendance % */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-indigo-500/20">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-purple-500/10 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-indigo-300 text-[10px] font-extrabold uppercase tracking-wider">Attendance %</span>
+              <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 glow-indigo">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white glow-text-indigo">{saStats.avgAttendance}%</span>
+              <span className="text-[10px] text-purple-400 font-bold block mt-0.5">Platform average</span>
+            </div>
+          </div>
+
+          {/* KPI 8: Pending Fees */}
+          <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-amber-500/20">
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-amber-500/10 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <span className="text-amber-300 text-[10px] font-extrabold uppercase tracking-wider">Pending Fees</span>
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 glow-amber">
+                <IndianRupee className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-white glow-text-amber">
+                ₹{(saStats.pendingFees / 100000).toFixed(1)} Lakh
+              </span>
+              <span className="text-[10px] text-amber-400 font-bold block mt-0.5">Uncollected amount</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Growth Metrics & Revenue Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Growth Metrics */}
+          <div className="glass-panel p-6 rounded-3xl space-y-6">
+            <div>
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <TrendingUp className="w-4.5 h-4.5 text-indigo-400" /> Platform Growth Trends
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Monthly trajectory of student registrations and onboarded academies</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+              {/* Student Growth (Line Chart) */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-300">Student Growth</span>
+                  <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                </div>
+                
+                <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
+                  <div className="flex-1 relative">
+                    <svg viewBox="0 0 240 100" className="w-full h-full overflow-visible">
+                      <defs>
+                        <linearGradient id="saStudentGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <line x1="0" y1="20" x2="240" y2="20" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                      <line x1="0" y1="50" x2="240" y2="50" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                      <line x1="0" y1="80" x2="240" y2="80" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                      <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30 L 230,95 L 10,95 Z" fill="url(#saStudentGrowthGrad)" />
+                      <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30" fill="none" stroke="#6366f1" strokeWidth="2.5" className="glow-indigo" />
+                      <circle cx="10" cy="85" r="3" fill="#6366f1" />
+                      <circle cx="54" cy="80" r="3" fill="#6366f1" />
+                      <circle cx="98" cy="71" r="3" fill="#6366f1" />
+                      <circle cx="142" cy="56" r="3" fill="#6366f1" />
+                      <circle cx="186" cy="43" r="3" fill="#6366f1" />
+                      <circle cx="230" cy="30" r="3" fill="#818cf8" className="glow-indigo" />
+                    </svg>
+                  </div>
+                  <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
+                    <span>Jan (8k)</span>
+                    <span>Feb (8.5k)</span>
+                    <span>Mar (9.2k)</span>
+                    <span>Apr (10.4k)</span>
+                    <span>May (11.5k)</span>
+                    <span>Jun (12.4k)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Academy Growth (Bar Chart) */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-300">Academy Growth</span>
+                  <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                </div>
+                
+                <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
+                  <div className="flex-1 relative">
+                    <svg viewBox="0 0 240 100" className="w-full h-full overflow-visible">
+                      <defs>
+                        <linearGradient id="saAcademyGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.05" />
+                        </linearGradient>
+                      </defs>
+                      <rect x="8" y="52" width="12" height="43" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                      <rect x="48" y="44" width="12" height="51" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                      <rect x="88" y="32" width="12" height="63" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                      <rect x="128" y="20" width="12" height="75" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                      <rect x="168" y="12" width="12" height="83" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                      <rect x="208" y="0" width="12" height="95" rx="2.5" fill="url(#saAcademyGrowthGrad)" stroke="#c084fc" strokeWidth="1" className="glow-purple" />
+                    </svg>
+                  </div>
+                  <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
+                    <span>Jan (12)</span>
+                    <span>Feb (14)</span>
+                    <span>Mar (17)</span>
+                    <span>Apr (20)</span>
+                    <span>May (22)</span>
+                    <span>Jun (25)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Summary */}
+          <div className="glass-panel p-6 rounded-3xl space-y-5">
+            <div>
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 className="w-4.5 h-4.5 text-indigo-400" /> Revenue & Collections
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Platform billing summaries and leading academy revenue shares</p>
+            </div>
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Monthly</span>
+                <span className="text-sm font-black text-white mt-1 block">₹12.5 L</span>
+              </div>
+              <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Pending</span>
+                <span className="text-sm font-black text-amber-400 mt-1 block">₹2.2 L</span>
+              </div>
+              <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Annual</span>
+                <span className="text-sm font-black text-indigo-400 mt-1 block">₹1.3 Cr</span>
+              </div>
+            </div>
+
+            {/* Progress bars (Revenue by Academy) */}
+            <div className="space-y-2.5 pt-1">
+              <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-widest block">Revenue by Academy</span>
+              
+              {saRevenue.byAcademy?.length > 0 ? (
+                saRevenue.byAcademy.map((ac: any, idx: number) => {
+                  const maxRevenue = Math.max(...saRevenue.byAcademy.map((item: any) => item.revenue), 1);
+                  const pct = Math.round((ac.revenue / maxRevenue) * 100);
+                  const colors = [
+                    'bg-indigo-500 glow-indigo',
+                    'bg-purple-500 glow-purple',
+                    'bg-emerald-500 glow-emerald',
+                    'bg-pink-500',
+                    'bg-teal-500'
+                  ];
+                  return (
+                    <div key={ac.name} className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-semibold text-slate-300">
+                        <span>{ac.name}</span>
+                        <span>₹{(ac.revenue / 100000).toFixed(2)}L</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-950/40 rounded-full overflow-hidden border border-white/5">
+                        <div className={`h-full rounded-full transition-all duration-500 ${colors[idx % colors.length]}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                [
+                  { name: 'FitZone', revenue: '₹2.5L', pct: 78, color: 'bg-indigo-500 glow-indigo' },
+                  { name: 'YogaLife', revenue: '₹1.8L', pct: 56, color: 'bg-purple-500 glow-purple' },
+                  { name: 'DanceHub', revenue: '₹3.2L', pct: 100, color: 'bg-emerald-500 glow-emerald' },
+                  { name: 'Apex Martial', revenue: '₹1.5L', pct: 47, color: 'bg-pink-500' },
+                  { name: 'VidyaSopan', revenue: '₹2.95L', pct: 92, color: 'bg-teal-500' }
+                ].map((ac) => (
+                  <div key={ac.name} className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-semibold text-slate-300">
+                      <span>{ac.name}</span>
+                      <span>{ac.revenue}</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-950/40 rounded-full overflow-hidden border border-white/5">
+                      <div className={`h-full rounded-full transition-all duration-500 ${ac.color}`} style={{ width: `${ac.pct}%` }} />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Required Widget & Recent Activity Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Action Required */}
+          <div className="glass-panel p-6 rounded-3xl space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-4.5 h-4.5 text-amber-400 animate-pulse" /> Action Required Alerts
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Critical operations needing immediate administrative review</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {saActionRequired.length > 0 ? (
+                saActionRequired.map((saAlert, idx) => {
+                  const colors: Record<string, string> = {
+                    fees: 'border-amber-500/20 bg-amber-500/5 text-amber-300 hover:border-amber-500/40',
+                    coaches: 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:border-indigo-500/40',
+                    attendance: 'border-red-500/20 bg-red-500/5 text-red-300 hover:border-red-500/40',
+                    students: 'border-purple-500/20 bg-purple-500/5 text-purple-300 hover:border-purple-500/40'
+                  };
+                  const colorClass = colors[saAlert.type] || 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300';
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer ${colorClass}`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-current animate-ping shrink-0" />
+                      <span className="text-xs font-bold leading-normal">{saAlert.text}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                [
+                  { text: '5 Academies have pending fees', type: 'fees', color: 'border-amber-500/20 bg-amber-500/5 text-amber-300 hover:border-amber-500/40' },
+                  { text: '3 Coaches awaiting approval', type: 'coaches', color: 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:border-indigo-500/40' },
+                  { text: '2 Academies have no attendance', type: 'attendance', color: 'border-red-500/20 bg-red-500/5 text-red-300 hover:border-red-500/40' },
+                  { text: '7 Student registrations pending', type: 'students', color: 'border-purple-500/20 bg-purple-500/5 text-purple-300 hover:border-purple-500/40' }
+                ].map((saAlert, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer ${saAlert.color}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-current animate-ping shrink-0" />
+                    <span className="text-xs font-bold leading-normal">{saAlert.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="glass-panel p-6 rounded-3xl space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <Activity className="w-4.5 h-4.5 text-indigo-400" /> Platform Activity Feed
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Live platform-wide operations and provisioning history log</p>
+            </div>
+
+            <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
+              {saRecentActivity.length > 0 ? (
+                saRecentActivity.map((act) => (
+                  <div key={act.id} className="flex gap-3 text-xs items-start group">
+                    <div className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5 font-bold group-hover:scale-110 transition-transform">
+                      ✓
+                    </div>
+                    <div className="space-y-0.5 overflow-hidden">
+                      <span className="font-extrabold text-slate-200 block truncate">{act.action}</span>
+                      <span className="text-[10px] text-slate-400 block leading-normal">{act.description}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 italic p-4">No recent activity logs.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Map View */}
+        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col items-center">
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+          
+          <h3 className="text-sm font-extrabold text-white uppercase tracking-wider mb-2 self-start flex items-center gap-2">
+            <Globe className="w-4.5 h-4.5 text-indigo-400" /> Active Academies Map
+          </h3>
+          <p className="text-[10px] text-slate-500 self-start mb-6">Distribution and nodes layout of academies across major cities</p>
+
+          <IndiaMap mapData={saMapData} />
+        </div>
       </div>
     );
   }

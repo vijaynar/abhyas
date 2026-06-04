@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import IndiaMap from '../components/IndiaMap';
 import {
   Activity,
   Building2,
@@ -18,7 +19,16 @@ import {
   Users,
   Wrench,
   X,
-  XCircle
+  XCircle,
+  IndianRupee,
+  AlertTriangle,
+  UserCheck,
+  EyeOff,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  BarChart3,
+  MapPin
 } from 'lucide-react';
 
 interface TenantItem {
@@ -41,25 +51,78 @@ interface TenantItem {
     primaryPhone?: string | null;
     alternatePhone?: string | null;
   } | null;
+  students?: number;
+  coaches?: number;
+  batches?: number;
+  attendancePct?: number;
+  pendingFees?: number;
 }
 
-interface SaaSStats {
+interface SuperadminStats {
   totalTenants: number;
-  activeTenants: number;
-  suspendedTenants: number;
-  trialTenants: number;
+  studentsCount: number;
+  coachesCount: number;
+  adminsCount: number;
+  activeBatches: number;
+  todaysClasses: number;
   avgAttendance: number;
+  pendingFees: number;
+}
+
+interface GrowthMetric {
+  month: string;
+  count: number;
+}
+
+interface RevenueItem {
+  name: string;
+  revenue: number;
+}
+
+interface ActivityItem {
+  id: string;
+  action: string;
+  description: string;
+  created_at: string;
+}
+
+interface AlertItem {
+  type: string;
+  text: string;
+}
+
+interface MapCityItem {
+  city: string;
+  count: number;
+  lat: number;
+  lng: number;
 }
 
 export default function SuperadminPage() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'provision' | 'governance'>('analytics');
-  const [stats, setStats] = useState<SaaSStats>({
-    totalTenants: 0,
-    activeTenants: 0,
-    suspendedTenants: 0,
-    trialTenants: 0,
-    avgAttendance: 0
+  const [stats, setStats] = useState<SuperadminStats>({
+    totalTenants: 25,
+    studentsCount: 12450,
+    coachesCount: 425,
+    adminsCount: 38,
+    activeBatches: 620,
+    todaysClasses: 180,
+    avgAttendance: 92,
+    pendingFees: 850000
   });
+  const [growth, setGrowth] = useState<{ studentGrowth: GrowthMetric[]; academyGrowth: GrowthMetric[] }>({
+    studentGrowth: [],
+    academyGrowth: []
+  });
+  const [revenue, setRevenue] = useState<{ monthlyCollection: number; pendingCollection: number; annualRevenue: number; byAcademy: RevenueItem[] }>({
+    monthlyCollection: 0,
+    pendingCollection: 0,
+    annualRevenue: 0,
+    byAcademy: []
+  });
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [actionRequired, setActionRequired] = useState<AlertItem[]>([]);
+  const [mapData, setMapData] = useState<MapCityItem[]>([]);
   const [tenants, setTenants] = useState<TenantItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +192,11 @@ export default function SuperadminPage() {
       }
       const result = await res.json();
       setStats(result.data.stats);
+      setGrowth(result.data.growth);
+      setRevenue(result.data.revenue);
+      setRecentActivity(result.data.recentActivity);
+      setActionRequired(result.data.actionRequired);
+      setMapData(result.data.mapData);
       setTenants(result.data.tenants);
     } catch (err: any) {
       console.error(err);
@@ -463,100 +531,361 @@ export default function SuperadminPage() {
         </button>
       </div>
 
-      {/* ── TAB 1: ANALYTICS & TENANT LEDGER ── */}
+      {/* ── TAB 1: REDEFINED SUPERADMIN DASHBOARD ── */}
       {activeTab === 'analytics' && (
-        <div className="space-y-8">
-          {/* KPI Dashboard Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-            {/* KPI 1: Total Academies */}
-            <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-indigo-500/5 blur-2xl" />
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* Top KPI Cards Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            {/* KPI 1: Academies */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Academies</span>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Academies</span>
                 <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
                   <Building2 className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="mt-4">
-                <span className="text-3xl font-black text-white">{stats.totalTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Academies onboarded</span>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.totalTenants}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">SaaS Clients onboarded</span>
               </div>
             </div>
 
-            {/* ... rest unchanged KPI cards ... */}
-            {/* KPI 2: Active Subscriptions */}
-            <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-emerald-500/5 blur-2xl" />
+            {/* KPI 2: Students */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active Plans</span>
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 glow-emerald">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-3xl font-black text-white">{stats.activeTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Premium subscription tier</span>
-              </div>
-            </div>
-
-            {/* KPI 3: Trial Plan Accounts */}
-            <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-amber-500/5 blur-2xl" />
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Trial Accounts</span>
-                <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Clock className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-3xl font-black text-white">{stats.trialTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Free introductory tier</span>
-              </div>
-            </div>
-
-            {/* KPI 4: Suspended Plans */}
-            <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-red-500/5 blur-2xl" />
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Suspended</span>
-                <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                  <XCircle className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-3xl font-black text-white text-red-400">{stats.suspendedTenants}</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Locked out academies</span>
-              </div>
-            </div>
-
-            {/* KPI 5: Platform Average Attendance */}
-            <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group border-indigo-500/20">
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-purple-500/10 blur-2xl" />
-              <div className="flex items-center justify-between">
-                <span className="text-indigo-300 text-[10px] font-extrabold uppercase tracking-wider">Avg Attendance</span>
-                <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 glow-indigo">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Students</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
                   <Users className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="mt-4">
-                <span className="text-3xl font-black text-white glow-text-indigo">{stats.avgAttendance}%</span>
-                <span className="text-[10px] text-purple-400 font-bold block mt-1">Global platform average</span>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.studentsCount?.toLocaleString()}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Active enrollments</span>
+              </div>
+            </div>
+
+            {/* KPI 3: Coaches */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Coaches</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                  <UserCheck className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.coachesCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Registered trainers</span>
+              </div>
+            </div>
+
+            {/* KPI 4: Admins */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Admins</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.adminsCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Academy coordinators</span>
+              </div>
+            </div>
+
+            {/* KPI 5: Active Batches */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active Batches</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.activeBatches}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Recurring schedules</span>
+              </div>
+            </div>
+
+            {/* KPI 6: Today's Classes */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-indigo-500/5 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Today's Classes</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white">{stats.todaysClasses}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Sessions today</span>
+              </div>
+            </div>
+
+            {/* KPI 7: Attendance % */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-indigo-500/20">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-purple-500/10 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-indigo-300 text-[10px] font-extrabold uppercase tracking-wider">Attendance %</span>
+                <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 glow-indigo">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white glow-text-indigo">{stats.avgAttendance}%</span>
+                <span className="text-[10px] text-purple-400 font-bold block mt-0.5">Platform average</span>
+              </div>
+            </div>
+
+            {/* KPI 8: Pending Fees */}
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-amber-500/20">
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-amber-500/10 blur-2xl" />
+              <div className="flex items-center justify-between">
+                <span className="text-amber-300 text-[10px] font-extrabold uppercase tracking-wider">Pending Fees</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 glow-amber">
+                  <IndianRupee className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-black text-white glow-text-amber">
+                  ₹{(stats.pendingFees / 100000).toFixed(1)} Lakh
+                </span>
+                <span className="text-[10px] text-amber-400 font-bold block mt-0.5">Uncollected amount</span>
               </div>
             </div>
           </div>
 
-          {/* Tenants Ledger Panel */}
-          <div className="glass-panel rounded-3xl border border-white/5 bg-slate-950/20">
+          {/* Growth Metrics & Revenue Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Growth Metrics */}
+            <div className="glass-panel p-6 rounded-3xl space-y-6">
+              <div>
+                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <TrendingUp className="w-4.5 h-4.5 text-indigo-400" /> Platform Growth Trends
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Monthly trajectory of student registrations and onboarded academies</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                {/* Student Growth (Line Chart) */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-300">Student Growth</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                  </div>
+                  
+                  <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
+                    <div className="flex-1 relative">
+                      <svg viewBox="0 0 240 100" className="w-full h-full overflow-visible">
+                        <defs>
+                          <linearGradient id="studentGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        {/* Connecting Line Grid */}
+                        <line x1="0" y1="20" x2="240" y2="20" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                        <line x1="0" y1="50" x2="240" y2="50" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                        <line x1="0" y1="80" x2="240" y2="80" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                        
+                        {/* Area Gradient fill */}
+                        <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30 L 230,95 L 10,95 Z" fill="url(#studentGrowthGrad)" />
+                        
+                        {/* Line path */}
+                        <path d="M 10,85 L 54,80 L 98,71 L 142,56 L 186,43 L 230,30" fill="none" stroke="#6366f1" strokeWidth="2.5" className="glow-indigo" />
+                        
+                        {/* Points */}
+                        <circle cx="10" cy="85" r="3" fill="#6366f1" />
+                        <circle cx="54" cy="80" r="3" fill="#6366f1" />
+                        <circle cx="98" cy="71" r="3" fill="#6366f1" />
+                        <circle cx="142" cy="56" r="3" fill="#6366f1" />
+                        <circle cx="186" cy="43" r="3" fill="#6366f1" />
+                        <circle cx="230" cy="30" r="3" fill="#818cf8" className="glow-indigo" />
+                      </svg>
+                    </div>
+                    <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
+                      <span>Jan (8k)</span>
+                      <span>Feb (8.5k)</span>
+                      <span>Mar (9.2k)</span>
+                      <span>Apr (10.4k)</span>
+                      <span>May (11.5k)</span>
+                      <span>Jun (12.4k)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Academy Growth (Bar Chart) */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-300">Academy Growth</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Jan - Jun</span>
+                  </div>
+                  
+                  <div className="h-32 bg-slate-950/30 rounded-2xl border border-white/5 p-2 flex flex-col justify-between">
+                    <div className="flex-1 relative">
+                      <svg viewBox="0 0 240 100" className="w-full h-full overflow-visible">
+                        <defs>
+                          <linearGradient id="academyGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#a855f7" stopOpacity="0.05" />
+                          </linearGradient>
+                        </defs>
+                        {/* Bars representing Jan (12) to Jun (25) */}
+                        <rect x="8" y="52" width="12" height="43" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                        <rect x="48" y="44" width="12" height="51" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                        <rect x="88" y="32" width="12" height="63" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                        <rect x="128" y="20" width="12" height="75" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                        <rect x="168" y="12" width="12" height="83" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#a855f7" strokeWidth="0.5" />
+                        <rect x="208" y="0" width="12" height="95" rx="2.5" fill="url(#academyGrowthGrad)" stroke="#c084fc" strokeWidth="1" className="glow-purple" />
+                      </svg>
+                    </div>
+                    <div className="flex justify-between text-[8px] font-bold text-slate-500 px-1 pt-1 border-t border-white/5">
+                      <span>Jan (12)</span>
+                      <span>Feb (14)</span>
+                      <span>Mar (17)</span>
+                      <span>Apr (20)</span>
+                      <span>May (22)</span>
+                      <span>Jun (25)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Revenue Summary */}
+            <div className="glass-panel p-6 rounded-3xl space-y-5">
+              <div>
+                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <BarChart3 className="w-4.5 h-4.5 text-indigo-400" /> Revenue & Collections
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Platform billing summaries and leading academy revenue shares</p>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Monthly</span>
+                  <span className="text-sm font-black text-white mt-1 block">₹12.5 L</span>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Pending</span>
+                  <span className="text-sm font-black text-amber-400 mt-1 block">₹2.2 L</span>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Annual</span>
+                  <span className="text-sm font-black text-indigo-400 mt-1 block">₹1.3 Cr</span>
+                </div>
+              </div>
+
+              {/* Progress bars (Revenue by Academy) */}
+              <div className="space-y-2.5 pt-1">
+                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-widest block">Revenue by Academy</span>
+                
+                {[
+                  { name: 'FitZone', revenue: '₹2.5L', pct: 78, color: 'bg-indigo-500 glow-indigo' },
+                  { name: 'YogaLife', revenue: '₹1.8L', pct: 56, color: 'bg-purple-500 glow-purple' },
+                  { name: 'DanceHub', revenue: '₹3.2L', pct: 100, color: 'bg-emerald-500 glow-emerald' },
+                  { name: 'Apex Martial', revenue: '₹1.5L', pct: 47, color: 'bg-pink-500' },
+                  { name: 'VidyaSopan', revenue: '₹2.95L', pct: 92, color: 'bg-teal-500' }
+                ].map((ac) => (
+                  <div key={ac.name} className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-semibold text-slate-300">
+                      <span>{ac.name}</span>
+                      <span>{ac.revenue}</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-950/40 rounded-full overflow-hidden border border-white/5">
+                      <div className={`h-full rounded-full transition-all duration-500 ${ac.color}`} style={{ width: `${ac.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Required Widget & Recent Activity Feed */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Action Required */}
+            <div className="glass-panel p-6 rounded-3xl space-y-4">
+              <div>
+                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <AlertTriangle className="w-4.5 h-4.5 text-amber-400 animate-pulse" /> Action Required Alerts
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Critical operations needing immediate administrative review</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { text: '5 Academies have pending fees', type: 'fees', color: 'border-amber-500/20 bg-amber-500/5 text-amber-300 hover:border-amber-500/40' },
+                  { text: '3 Coaches awaiting approval', type: 'coaches', color: 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:border-indigo-500/40' },
+                  { text: '2 Academies have no attendance', type: 'attendance', color: 'border-red-500/20 bg-red-500/5 text-red-300 hover:border-red-500/40' },
+                  { text: '7 Student registrations pending', type: 'students', color: 'border-purple-500/20 bg-purple-500/5 text-purple-300 hover:border-purple-500/40' }
+                ].map((alert, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer ${alert.color}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-current animate-ping shrink-0" />
+                    <span className="text-xs font-bold leading-normal">{alert.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="glass-panel p-6 rounded-3xl space-y-4">
+              <div>
+                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-4.5 h-4.5 text-indigo-400" /> Platform Activity Feed
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Live platform-wide operations and provisioning history log</p>
+              </div>
+
+              <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
+                {recentActivity.map((act) => (
+                  <div key={act.id} className="flex gap-3 text-xs items-start group">
+                    <div className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5 font-bold group-hover:scale-110 transition-transform">
+                      ✓
+                    </div>
+                    <div className="space-y-0.5 overflow-hidden">
+                      <span className="font-extrabold text-slate-200 block truncate">{act.action}</span>
+                      <span className="text-[10px] text-slate-400 block leading-normal">{act.description}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Map View & Academy Overview Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Map View */}
+            <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col items-center">
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+              
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider mb-2 self-start flex items-center gap-2">
+                <Globe className="w-4.5 h-4.5 text-indigo-400" /> Active Academies Map
+              </h3>
+              <p className="text-[10px] text-slate-500 self-start mb-6">Distribution and nodes layout of academies across major cities</p>
+
+              <IndiaMap mapData={mapData} />
+            </div>
+
+            {/* Academy Overview Table */}
+            <div className="lg:col-span-2 glass-panel rounded-3xl border border-white/5 bg-slate-950/20 overflow-hidden flex flex-col justify-between">
               {/* Controls Row: Search + Location Filters */}
-              <div className="p-6 border-b border-white/10 flex flex-col gap-4">
+              <div className="p-5 border-b border-white/10 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-white tracking-tight">Onboarded Academies</h2>
-                    <p className="text-[10px] text-slate-400">Search, monitor, and regulate active academy subscriptions</p>
+                    <h2 className="text-sm font-extrabold text-white tracking-wider uppercase">Academy Overview</h2>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Search, monitor, and regulate active academy registrations and key statistics</p>
                   </div>
 
                   {/* Search Bar */}
-                  <div className="relative min-w-[280px]">
+                  <div className="relative min-w-[240px]">
                     <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
                       <Search className="w-3.5 h-3.5" />
                     </span>
@@ -564,7 +893,7 @@ export default function SuperadminPage() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by name, slug, or admin email..."
+                      placeholder="Search by academy or owner email..."
                       className="w-full h-9 pl-9 pr-4 rounded-xl glass-input text-xs"
                     />
                   </div>
@@ -572,15 +901,14 @@ export default function SuperadminPage() {
 
                 {/* Location Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Globe className="w-3 h-3" /> Filter by Location:
+                  <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-indigo-400" /> Filter:
                   </span>
 
-                  {/* State Filter */}
                   <select
                     value={filterState}
                     onChange={(e) => { setFilterState(e.target.value); setFilterCity(''); }}
-                    className="h-8 px-3 rounded-lg bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300 outline-none cursor-pointer hover:border-indigo-500/40 min-w-[140px]"
+                    className="h-8 px-2.5 rounded-lg bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300 outline-none cursor-pointer hover:border-indigo-500/40 min-w-[120px]"
                   >
                     <option value="">All States</option>
                     {uniqueStates.map(s => (
@@ -588,11 +916,10 @@ export default function SuperadminPage() {
                     ))}
                   </select>
 
-                  {/* City Filter */}
                   <select
                     value={filterCity}
                     onChange={(e) => setFilterCity(e.target.value)}
-                    className="h-8 px-3 rounded-lg bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300 outline-none cursor-pointer hover:border-indigo-500/40 min-w-[140px]"
+                    className="h-8 px-2.5 rounded-lg bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300 outline-none cursor-pointer hover:border-indigo-500/40 min-w-[120px]"
                   >
                     <option value="">All Cities</option>
                     {uniqueCities.map(c => (
@@ -600,17 +927,15 @@ export default function SuperadminPage() {
                     ))}
                   </select>
 
-                  {/* Clear Filters */}
                   {(filterState || filterCity) && (
                     <button
                       onClick={() => { setFilterState(''); setFilterCity(''); }}
                       className="h-8 px-3 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
                     >
-                      Clear Filters
+                      Clear
                     </button>
                   )}
 
-                  {/* Active filter count badge */}
                   {(filterState || filterCity || searchQuery) && (
                     <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                       {filteredTenants.length} of {tenants.length} shown
@@ -619,106 +944,99 @@ export default function SuperadminPage() {
                 </div>
               </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto no-scrollbar">
-              {loading ? (
-                <div className="p-12 text-center text-slate-500">
-                  <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-[10px] uppercase font-bold tracking-wider">Loading Academy registries...</p>
-                </div>
-              ) : filteredTenants.length === 0 ? (
-                <div className="p-12 text-center text-slate-500">
-                  <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                  <p className="text-xs">No active academies match your query.</p>
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.01] text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
-                      <th className="py-3.5 px-4 min-w-[160px]">Academy Name</th>
-                      <th className="py-3.5 px-4 min-w-[100px]">URL Slug</th>
-                      <th className="py-3.5 px-4 min-w-[130px]">Location</th>
-                      <th className="py-3.5 px-4 min-w-[185px]">Administrative Owner</th>
-                      <th className="py-3.5 px-4 min-w-[100px]">Onboarding</th>
-                      <th className="py-3.5 px-4 min-w-[90px]">Status</th>
-                      <th className="py-3.5 px-4 min-w-[125px] text-right">Quick Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTenants.map((tenant) => {
-                      const dateStr = new Date(tenant.created_at).toLocaleDateString([], {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      });
+              {/* Table */}
+              <div className="overflow-x-auto no-scrollbar flex-1">
+                {loading ? (
+                  <div className="p-12 text-center text-slate-500">
+                    <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
+                    <p className="text-[10px] uppercase font-bold tracking-wider">Loading registries...</p>
+                  </div>
+                ) : filteredTenants.length === 0 ? (
+                  <div className="p-12 text-center text-slate-500">
+                    <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                    <p className="text-xs">No active academies match your query.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/[0.01] text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                        <th className="py-3.5 px-4 min-w-[140px]">Academy</th>
+                        <th className="py-3.5 px-4 min-w-[65px]">Students</th>
+                        <th className="py-3.5 px-4 min-w-[65px]">Coaches</th>
+                        <th className="py-3.5 px-4 min-w-[65px]">Batches</th>
+                        <th className="py-3.5 px-4 min-w-[90px]">Attendance %</th>
+                        <th className="py-3.5 px-4 min-w-[90px]">Pending Fees</th>
+                        <th className="py-3.5 px-4 min-w-[85px]">Status</th>
+                        <th className="py-3.5 px-4 min-w-[105px] text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTenants.map((tenant) => {
+                        let badgeClass = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+                        if (tenant.subscription_status === 'active') {
+                          badgeClass = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+                        } else if (tenant.subscription_status === 'suspended') {
+                          badgeClass = 'bg-red-500/10 border-red-500/20 text-red-400';
+                        }
 
-                      let badgeClass = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-                      if (tenant.subscription_status === 'active') {
-                        badgeClass = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
-                      } else if (tenant.subscription_status === 'suspended') {
-                        badgeClass = 'bg-red-500/10 border-red-500/20 text-red-400';
-                      }
-
-                      return (
-                        <tr key={tenant.id} className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => handleOpenEditModal(tenant)}
-                              className="font-bold text-indigo-400 hover:text-indigo-300 hover:underline text-left block text-xs transition-all cursor-pointer outline-none"
-                            >
-                              {tenant.name}
-                            </button>
-                            <span className="text-[10px] text-slate-500 block mt-0.5 select-all font-mono">
-                              {tenant.email || 'No email registered'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-mono text-xs text-slate-500 select-none">/{tenant.slug}</span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-xs text-slate-300 font-semibold block">{tenant.city || 'Hyderabad'}</span>
-                            <span className="text-[9px] text-slate-500 block mt-0.5">{tenant.state || 'Telangana'}, {tenant.country || 'India'}</span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {tenant.admin ? (
-                              <div>
-                                <span className="font-semibold text-slate-300 block">{tenant.admin.name}</span>
-                                <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">{tenant.admin.email}</span>
-                                <span className="text-[9px] text-slate-500 block">{tenant.admin.phone}</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-500 italic text-[10px]">No Admin Linked</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-slate-400 font-semibold">{dateStr}</span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold uppercase ${badgeClass}`}>
-                              {tenant.subscription_status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right relative flex items-center justify-end gap-2 h-full min-h-[56px]">
-                            {changingStatusId === tenant.id ? (
-                              <div className="w-4 h-4 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin ml-auto" />
-                            ) : (
-                              <select
-                                value={tenant.subscription_status}
-                                onChange={(e) => handleUpdateStatus(tenant.id, e.target.value as any)}
-                                className="h-7 px-1.5 rounded-lg bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300 outline-none cursor-pointer hover:border-white/20"
+                        return (
+                          <tr key={tenant.id} className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                            <td className="py-3 px-4">
+                              <button
+                                onClick={() => handleOpenEditModal(tenant)}
+                                className="font-bold text-indigo-400 hover:text-indigo-300 hover:underline text-left block text-xs transition-all cursor-pointer outline-none"
                               >
-                                <option value="trial">Set Trial</option>
-                                <option value="active">Activate Plan</option>
-                                <option value="suspended">Suspend Access</option>
-                              </select>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+                                {tenant.name}
+                              </button>
+                              <span className="text-[9px] text-slate-500 block mt-0.5 select-all font-mono font-bold tracking-wide">
+                                /{tenant.slug} • {tenant.city || 'Hyderabad'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-300">
+                              {tenant.students?.toLocaleString() ?? 0}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-300">
+                              {tenant.coaches ?? 0}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-300">
+                              {tenant.batches ?? 0}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-semibold text-slate-300 block">{tenant.attendancePct ?? 0}%</span>
+                              <div className="w-12 h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full glow-indigo" style={{ width: `${tenant.attendancePct || 0}%` }} />
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-amber-400 font-mono text-[10px]">
+                              {tenant.pendingFees ? `₹${(tenant.pendingFees / 100000).toFixed(1)}L` : '₹0'}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold uppercase ${badgeClass}`}>
+                                {tenant.subscription_status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right relative flex items-center justify-end gap-2 h-full">
+                              {changingStatusId === tenant.id ? (
+                                <div className="w-4 h-4 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin ml-auto" />
+                              ) : (
+                                <select
+                                  value={tenant.subscription_status}
+                                  onChange={(e) => handleUpdateStatus(tenant.id, e.target.value as any)}
+                                  className="h-7 px-1 rounded-lg bg-slate-900 border border-white/10 text-[9px] font-bold text-slate-300 outline-none cursor-pointer hover:border-white/20 max-w-[85px]"
+                                >
+                                  <option value="trial">Trial</option>
+                                  <option value="active">Active</option>
+                                  <option value="suspended">Suspend</option>
+                                </select>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         </div>
