@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createBrowserClient } from '@/lib/supabase';
 import {
@@ -24,7 +24,11 @@ import {
   UserCog,
   X,
   BarChart2,
-  ShieldAlert
+  ShieldAlert,
+  ChevronDown,
+  ChevronRight,
+  Camera,
+  Megaphone
 } from 'lucide-react';
 import ThemeSelector from './components/ThemeSelector';
 import { useTheme } from '@/lib/theme';
@@ -50,6 +54,48 @@ interface UserProfile {
   } | null;
 }
 
+function ReportsSubmenuList({
+  items,
+  pathname,
+  setSidebarOpen,
+}: {
+  items: Array<{ name: string; href: string }>;
+  pathname: string;
+  setSidebarOpen: (open: boolean) => void;
+}) {
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'batch';
+
+  return (
+    <div className="pl-6 space-y-1 mt-1 animate-in slide-in-from-top-1 duration-150">
+      {items.map((subItem) => {
+        let active = false;
+        if (subItem.href === '/admin/fines') {
+          active = pathname === '/admin/fines';
+        } else {
+          const targetTab = subItem.href.split('tab=')[1] || 'batch';
+          active = pathname === '/admin/reports' && activeTab === targetTab;
+        }
+
+        return (
+          <Link
+            key={subItem.name}
+            href={subItem.href}
+            onClick={() => setSidebarOpen(false)}
+            className={`flex items-center gap-3 px-4 h-9 rounded-lg text-[13px] font-medium transition-all duration-200 group
+            ${active 
+              ? 'text-indigo-400 font-bold bg-indigo-500/5' 
+              : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.02]'}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-indigo-400 glow-indigo' : 'bg-slate-700 group-hover:bg-slate-500'}`} />
+            {subItem.name}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +105,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createBrowserClient();
+  const [reportsExpanded, setReportsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (pathname === '/admin/fines' || pathname.startsWith('/admin/reports')) {
+      setReportsExpanded(true);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -144,6 +197,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isCoach = profile?.role === 'coach';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
+  const coachActions = [
+    { name: 'Mark Attendance', href: '/admin/attendance', icon: Camera },
+    { name: 'Scan Group Photo', href: '/admin/attendance/group-scan', icon: Camera },
+    { name: 'Apply Leave', href: '/admin/dashboard#leave-registry', icon: Calendar },
+    { name: 'Announcements', href: '/admin/dashboard#announcements-feed', icon: Megaphone },
+  ];
+
   const hasPermission = (module: string, action: string) => {
     if (!profile) return false;
     if (profile.role === 'superadmin') {
@@ -165,7 +225,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const topItems = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    ...(hasPermission('attendance', 'view') ? [{ name: 'Attendance', href: '/admin/attendance', icon: FileText }] : []),
+    ...(!isCoach && hasPermission('attendance', 'view') ? [{ name: 'Attendance', href: '/admin/attendance', icon: FileText }] : []),
     ...(isCoach ? [{ name: 'My Profile', href: '/admin/profile', icon: User }] : []),
   ];
 
@@ -175,10 +235,54 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(hasPermission('students', 'view') ? [{ name: 'Students', href: '/admin/students', icon: Users }] : []),
   ];
 
-  const accountsItems = [
-    ...(hasPermission('payments', 'view') ? [{ name: 'Fines & Payments', href: '/admin/fines', icon: IndianRupee }] : []),
-    ...(hasPermission('reports', 'view') ? [{ name: 'Reports', href: '/admin/reports', icon: BarChart2 }] : []),
+  const reportsSubItems = [
+    ...(hasPermission('payments', 'view') ? [{ name: 'Fines & Payments', href: '/admin/fines' }] : []),
+    ...(hasPermission('reports', 'view') ? [
+      { name: 'Batch attendance', href: '/admin/reports?tab=batch' },
+      { name: 'Coach Performance', href: '/admin/reports?tab=coach' },
+      { name: 'Student Progress', href: '/admin/reports?tab=student' },
+      { name: 'Fine collection', href: '/admin/reports?tab=collection' },
+    ] : []),
   ];
+
+  const isReportsActive = pathname === '/admin/fines' || pathname.startsWith('/admin/reports');
+
+  const renderReportsMenu = () => {
+    if (reportsSubItems.length === 0) return null;
+
+    return (
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={() => setReportsExpanded(!reportsExpanded)}
+          className={`w-full flex items-center justify-between px-4 h-10 rounded-xl text-sm font-medium transition-all duration-200 group
+          ${isReportsActive 
+            ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/20' 
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+        >
+          <div className="flex items-center gap-3">
+            <BarChart2 className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${isReportsActive ? 'text-indigo-400' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+            <span>Reports</span>
+          </div>
+          {reportsExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
+          )}
+        </button>
+
+        {reportsExpanded && (
+          <Suspense fallback={<div className="pl-6 text-xs text-slate-500 py-1">Loading...</div>}>
+            <ReportsSubmenuList
+              items={reportsSubItems}
+              pathname={pathname}
+              setSidebarOpen={setSidebarOpen}
+            />
+          </Suspense>
+        )}
+      </div>
+    );
+  };
 
   const adminItems = [
     ...(profile?.role === 'superadmin' ? [{ name: 'Academies', href: '/admin/superadmin', icon: ShieldAlert }] : []),
@@ -290,7 +394,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="space-y-1">
             {topItems.map((item) => renderNavItem(item))}
           </div>
-
+          {/* Section 1.5: Coach Actions */}
+          {isCoach && (
+            <div>
+              <div className="h-px bg-white/10 my-3" />
+              <div className="space-y-1">
+                <span className="px-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">
+                  Actions
+                </span>
+                {coachActions.map((item) => renderNavItem(item))}
+              </div>
+            </div>
+          )}
           {/* Section 2: Manage */}
           {manageItems.length > 0 && (
             <div>
@@ -304,15 +419,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
 
-          {/* Section 3: Accounts */}
-          {accountsItems.length > 0 && (
+          {/* Section 3: Reports */}
+          {reportsSubItems.length > 0 && (
             <div>
               <div className="h-px bg-white/10 my-3" />
               <div className="space-y-1">
                 <span className="px-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">
-                  Accounts
+                  Reports & Analytics
                 </span>
-                {accountsItems.map((item) => renderNavItem(item))}
+                {renderReportsMenu()}
               </div>
             </div>
           )}

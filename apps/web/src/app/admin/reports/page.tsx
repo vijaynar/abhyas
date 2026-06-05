@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import {
   Calendar as CalendarIcon,
@@ -20,7 +20,8 @@ import {
   Download,
   Users,
   User as UserIcon,
-  FileText
+  FileText,
+  UserCog
 } from 'lucide-react';
 
 const MONTHS = [
@@ -63,9 +64,34 @@ interface FineItem {
   issued_date: string;
 }
 
-export default function AdminReportsPage() {
+interface CoachStat {
+  id: string;
+  first_name: string;
+  last_name: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  coach_profile: {
+    expertise: string | null;
+    availability_slots?: string | null;
+    hourly_rate?: number;
+  } | null;
+  approvedBatchCount: number;
+  estimatedEarnings: number;
+  totalSessions: number;
+}
+
+interface ChartItem {
+  label: string;
+  key: string;
+  collected: number;
+  pending: number;
+}
+
+function AdminReportsContent() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'batch' | 'student'>('batch');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'batch' | 'coach' | 'student' | 'collection'>('batch');
   const [loading, setLoading] = useState(true);
   const [loadingReport, setLoadingReport] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,7 +100,23 @@ export default function AdminReportsPage() {
   // Role/coach settings
   const [userRole, setUserRole] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [tenantId, setTenantId] = useState<string>('');
   const [assignmentDate, setAssignmentDate] = useState<string | null>(null);
+
+  // Coach Performance Tab States
+  const [coachStats, setCoachStats] = useState<CoachStat[]>([]);
+  const [loadingCoachStats, setLoadingCoachStats] = useState(false);
+
+  // Fine Collection Tab States
+  const [collectionChartData, setCollectionChartData] = useState<ChartItem[]>([]);
+  const [loadingCollectionData, setLoadingCollectionData] = useState(false);
+
+  // Sync activeTab with tabParam
+  useEffect(() => {
+    if (tabParam === 'batch' || tabParam === 'coach' || tabParam === 'student' || tabParam === 'collection') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Date selection states
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -116,7 +158,7 @@ export default function AdminReportsPage() {
         setCurrentUserId(user.id);
         const { data: profile } = await supabase
           .from('users')
-          .select('role')
+          .select('role, tenant_id')
           .eq('id', user.id)
           .single();
         if (profile) {
@@ -126,6 +168,7 @@ export default function AdminReportsPage() {
             return;
           }
           setUserRole(role);
+          setTenantId(profile.tenant_id ?? '');
         }
       }
 
@@ -409,13 +452,135 @@ export default function AdminReportsPage() {
     }
   };
 
+  const loadCoachStats = async (tId: string) => {
+    if (!tId) return;
+    setLoadingCoachStats(true);
+    try {
+      const { data: coaches } = await supabase
+        .from('users')
+        .select(`
+          id, first_name, last_name, avatar_url, is_active,
+          coach_profile:coaches(expertise:primary_skill, hourly_rate, availability_slots),
+          batch_assignments:coach_batch_assignments!coach_batch_assignments_coach_id_fkey(id, status, batch_id)
+        `)
+        .eq('tenant_id', tId)
+        .eq('role', 'coach')
+        .eq('is_active', true);
+
+      if (coaches && coaches.length > 0) {
+        const allBatchIds = coaches.flatMap((c: any) =>
+          (c.batch_assignments || []).filter((a: any) => a.status === 'approved').map((a: any) => a.batch_id)
+        );
+
+        let sessionCounts: Record<string, number> = {};
+        if (allBatchIds.length > 0) {
+          const { data: sessions } = await supabase
+            .from('attendance_logs')
+            .select('batch_id, date')
+            .eq('tenant_id', tId)
+            .in('batch_id', allBatchIds);
+
+          if (sessions) {
+            const batchDateSets: Record<string, Set<string>> = {};
+            sessions.forEach((s: any) => {
+              if (!batchDateSets[s.batch_id]) batchDateSets[s.batch_id] = new Set();
+              batchDateSets[s.batch_id].add(s.date);
+            });
+            Object.entries(batchDateSets).forEach(([batchId, dates]) => {
+              sessionCounts[batchId] = dates.size;
+            });
+          }
+        }
+
+        const stats: CoachStat[] = coaches.map((c: any) => {
+          const approved = (c.batch_assignments || []).filter((a: any) => a.status === 'approved');
+          const totalSessions = approved.reduce((sum: number, a: any) => sum + (sessionCounts[a.batch_id] || 0), 0);
+          const hourlyRate = c.coach_profile?.hourly_rate ?? 500;
+          return {
+            id: c.id,
+            first_name: c.first_name,
+            last_name: c.last_name,
+            avatar_url: c.avatar_url,
+            is_active: c.is_active,
+            coach_profile: {
+              expertise: c.coach_profile?.expertise || null,
+              availability_slots: c.coach_profile?.availability_slots || null,
+              hourly_rate: hourlyRate
+            },
+            approvedBatchCount: approved.length,
+            estimatedEarnings: totalSessions * hourlyRate,
+            totalSessions,
+          };
+        });
+        setCoachStats(stats);
+      } else {
+        setCoachStats([]);
+      }
+    } catch (err) {
+      console.error('Failed to load coach stats for reports:', err);
+    } finally {
+      setLoadingCoachStats(false);
+    }
+  };
+
+  const loadCollectionData = async (tId: string) => {
+    if (!tId) return;
+    setLoadingCollectionData(true);
+    try {
+      const { data: allFines } = await supabase
+        .from('fines')
+        .select('amount, status, issued_date, paid_date')
+        .eq('tenant_id', tId);
+
+      const monthsList: ChartItem[] = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        monthsList.push({
+          label: d.toLocaleString('default', { month: 'short' }),
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          collected: 0,
+          pending: 0,
+        });
+      }
+
+      if (allFines) {
+        allFines.forEach((fine: any) => {
+          const dateStr = fine.status === 'paid' && fine.paid_date ? fine.paid_date : fine.issued_date;
+          if (!dateStr) return;
+
+          const date = new Date(dateStr);
+          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+          const bucket = monthsList.find(m => m.key === key);
+          if (bucket) {
+            if (fine.status === 'paid') {
+              bucket.collected += Number(fine.amount);
+            } else if (fine.status === 'unpaid' || fine.status === 'pending_verification') {
+              bucket.pending += Number(fine.amount);
+            }
+          }
+        });
+      }
+      setCollectionChartData(monthsList);
+    } catch (err) {
+      console.error('Failed to load collection trends for reports:', err);
+    } finally {
+      setLoadingCollectionData(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'batch') {
       loadBatchReport();
-    } else {
+    } else if (activeTab === 'student') {
       loadStudentReport();
+    } else if (activeTab === 'coach' && tenantId) {
+      loadCoachStats(tenantId);
+    } else if (activeTab === 'collection' && tenantId) {
+      loadCollectionData(tenantId);
     }
-  }, [activeTab, selectedBatch, selectedStudent, selectedYear, selectedMonth]);
+  }, [activeTab, selectedBatch, selectedStudent, selectedYear, selectedMonth, tenantId]);
 
   useEffect(() => {
     // When class filter changes, auto-select first batch in filtered set
@@ -782,10 +947,10 @@ export default function AdminReportsPage() {
         <div className="space-y-6">
           
           {/* Sub-Tab Navigation Bar */}
-          <div className="flex border-b border-white/10 pb-px gap-6 no-print">
+          <div className="flex border-b border-white/10 pb-px gap-6 no-print overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('batch')}
-              className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer
+              className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer flex-shrink-0
               ${activeTab === 'batch' 
                 ? 'text-indigo-400' 
                 : 'text-slate-500 hover:text-slate-300'}`}
@@ -798,9 +963,26 @@ export default function AdminReportsPage() {
               )}
             </button>
 
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setActiveTab('coach')}
+                className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer flex-shrink-0
+                ${activeTab === 'coach' 
+                  ? 'text-indigo-400' 
+                  : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <UserCog className="w-4 h-4" /> Coach Performance
+                </span>
+                {activeTab === 'coach' && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-full glow-indigo" />
+                )}
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab('student')}
-              className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer
+              className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer flex-shrink-0
               ${activeTab === 'student' 
                 ? 'text-indigo-400' 
                 : 'text-slate-500 hover:text-slate-300'}`}
@@ -812,6 +994,23 @@ export default function AdminReportsPage() {
                 <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-full glow-indigo" />
               )}
             </button>
+
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setActiveTab('collection')}
+                className={`pb-3 text-xs font-extrabold uppercase tracking-widest transition-colors relative cursor-pointer flex-shrink-0
+                ${activeTab === 'collection' 
+                  ? 'text-indigo-400' 
+                  : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <IndianRupee className="w-4 h-4" /> Fine Collection
+                </span>
+                {activeTab === 'collection' && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-full glow-indigo" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* TAB 1: BATCH MATRIX VIEW */}
@@ -1374,8 +1573,273 @@ export default function AdminReportsPage() {
             </div>
           )}
 
+          {/* TAB 3: COACH PERFORMANCE */}
+          {activeTab === 'coach' && (
+            <div className="space-y-6 print-full-width">
+              {loadingCoachStats ? (
+                <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
+                  <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                    Compiling coach metrics...
+                  </p>
+                </div>
+              ) : coachStats.length === 0 ? (
+                <div className="glass-panel p-12 text-center rounded-3xl">
+                  <UserCog className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                  <h3 className="text-slate-300 font-bold text-sm">No Coach Profiles</h3>
+                  <p className="text-slate-500 text-xs mt-1">There are no coaches registered in this academy.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* KPI Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {/* Active Coaches */}
+                    <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/5 blur-2xl group-hover:bg-purple-500/10 transition-colors" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-xs font-bold tracking-wide uppercase">Active Coaches</span>
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                          <Users className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-white">{coachStats.length}</span>
+                        <span className="text-xs text-slate-500 font-semibold block mt-1">On roster</span>
+                      </div>
+                    </div>
+                    {/* Total Sessions */}
+                    <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-cyan-500/5 blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-xs font-bold tracking-wide uppercase">Total Sessions</span>
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                          <Clock className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-white">{coachStats.reduce((s, c) => s + c.totalSessions, 0)}</span>
+                        <span className="text-xs text-slate-500 font-semibold block mt-1">Sessions conducted</span>
+                      </div>
+                    </div>
+                    {/* Coach Earnings */}
+                    <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group border-purple-500/20">
+                      <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/10 blur-2xl group-hover:bg-purple-500/20 transition-colors" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-200 text-xs font-extrabold tracking-wide uppercase">Est. Coach Payouts</span>
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                          <IndianRupee className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-white">₹{coachStats.reduce((s, c) => s + c.estimatedEarnings, 0).toLocaleString()}</span>
+                        <span className="text-xs text-purple-400 font-bold block mt-1">Total estimated</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coach Earnings & Availability Registry */}
+                  <div className="glass-panel p-6 rounded-3xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-purple-500/5 blur-3xl pointer-events-none" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                          <UserCog className="w-4 h-4 text-purple-400" /> Coach Earnings & Availability Registry
+                        </h2>
+                        <p className="text-[11px] text-slate-400">Session earnings, availability slots, and batch assignments per coach</p>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-white/[0.02] text-xs font-bold text-slate-400">
+                            <th className="p-3 w-[25%] min-w-[160px]">Coach</th>
+                            <th className="p-3 w-[15%] min-w-[120px]">Expertise</th>
+                            <th className="p-3 w-[20%] min-w-[160px]">Availability</th>
+                            <th className="p-3 text-center w-[10%] min-w-[70px]">Batches</th>
+                            <th className="p-3 text-center w-[10%] min-w-[70px]">Sessions</th>
+                            <th className="p-3 text-right w-[10%] min-w-[100px]">Rate / Session</th>
+                            <th className="p-3 text-right w-[10%] min-w-[110px]">Est. Earnings</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-xs divide-y divide-white/5">
+                          {coachStats.map((coach) => (
+                            <tr key={coach.id} className="hover:bg-white/[0.02] transition-colors">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300 font-bold text-xs flex-shrink-0">
+                                    {coach.avatar_url
+                                      ? <img src={coach.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                      : `${coach.first_name[0]}${coach.last_name[0]}`
+                                    }
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-slate-200">{coach.first_name} {coach.last_name}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3 text-slate-400 max-w-[140px]">
+                                <span className="truncate block">{coach.coach_profile?.expertise || '—'}</span>
+                              </td>
+                              <td className="p-3 max-w-[160px]">
+                                {coach.coach_profile?.availability_slots
+                                  ? <span className="text-indigo-300 text-[10px] font-semibold leading-tight block">{coach.coach_profile.availability_slots}</span>
+                                  : <span className="text-slate-600 italic">Not set</span>
+                                }
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold">
+                                  {coach.approvedBatchCount}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className="text-slate-200 font-bold">{coach.totalSessions}</span>
+                              </td>
+                              <td className="p-3 text-right text-slate-300 font-mono">
+                                ₹{(coach.coach_profile?.hourly_rate ?? 500).toLocaleString()}
+                              </td>
+                              <td className="p-3 text-right">
+                                <span className="text-purple-300 font-black">₹{coach.estimatedEarnings.toLocaleString()}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: FINE COLLECTION ANALYTICS */}
+          {activeTab === 'collection' && (
+            <div className="space-y-6 print-full-width">
+              {loadingCollectionData ? (
+                <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
+                  <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                    Compiling collection data...
+                  </p>
+                </div>
+              ) : (
+                <div className="glass-panel p-6 rounded-3xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-400" /> Fine Collection Analytics
+                      </h2>
+                      <p className="text-[11px] text-slate-400">Month-by-month comparisons of collected vs. outstanding penalties</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold">
+                      <div className="flex items-center gap-1.5 bg-emerald-500/5 px-2.5 py-1 rounded-lg border border-emerald-500/10">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
+                        <span className="text-slate-300">Collected (Paid)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-amber-500/5 px-2.5 py-1 rounded-lg border border-amber-500/10">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)] animate-pulse" />
+                        <span className="text-slate-300">Pending / Unpaid</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {collectionChartData.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-center text-slate-500">
+                      <AlertCircle className="w-8 h-8 mb-2 text-slate-600 animate-bounce" />
+                      <p className="text-xs">No active fines data to plot.</p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const maxVal = Math.max(...collectionChartData.map(d => d.collected + d.pending), 5000);
+                      const yTicks = [maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0];
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="relative h-64 w-full flex items-end gap-2 md:gap-8 pt-6 pb-2 px-4 border-b border-white/10">
+                            {/* Y-Axis Grid Lines */}
+                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] text-slate-600 font-mono pr-2 font-semibold">
+                              {yTicks.map((tick, i) => (
+                                <div key={i} className="w-full flex items-center justify-between border-t border-white/[0.03] pt-1">
+                                  <span className="bg-slate-950/80 px-1 rounded">₹{Math.round(tick).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Bars */}
+                            <div className="relative z-10 w-full h-full flex justify-around items-end">
+                              {collectionChartData.map((d) => {
+                                const colPercent = (d.collected / maxVal) * 100;
+                                const pendPercent = (d.pending / maxVal) * 100;
+                                
+                                return (
+                                  <div key={d.key} className="flex flex-col items-center group relative w-16">
+                                    {/* Tooltip on Hover */}
+                                    <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center bg-slate-950 border border-white/10 rounded-xl p-3 shadow-2xl text-[10px] text-slate-300 z-30 min-w-[140px] pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+                                      <span className="font-bold text-white mb-1.5 tracking-wide text-xs block">{d.label} {d.key.split('-')[0]}</span>
+                                      <div className="flex justify-between w-full text-emerald-400 font-medium py-0.5">
+                                        <span>Paid:</span>
+                                        <span className="font-bold">₹{d.collected.toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex justify-between w-full text-amber-400 font-medium py-0.5">
+                                        <span>Pending:</span>
+                                        <span className="font-bold">₹{d.pending.toLocaleString()}</span>
+                                      </div>
+                                      <div className="border-t border-white/10 w-full mt-1.5 pt-1.5 flex justify-between text-indigo-400 font-bold">
+                                        <span>Total Fines:</span>
+                                        <span>₹{(d.collected + d.pending).toLocaleString()}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Bar Column Container */}
+                                    <div className="w-full h-48 flex items-end gap-1.5 justify-center">
+                                      {/* Collected Bar */}
+                                      <div 
+                                        style={{ height: `${Math.max(colPercent, 3)}%` }} 
+                                        className="w-3 md:w-4 rounded-t bg-gradient-to-t from-emerald-600 to-emerald-400 group-hover:brightness-110 transition-all shadow-[0_0_8px_rgba(16,185,129,0.15)] group-hover:shadow-[0_0_12px_rgba(16,185,129,0.35)] duration-300 cursor-pointer"
+                                      />
+                                      {/* Pending Bar */}
+                                      <div 
+                                        style={{ height: `${Math.max(pendPercent, 3)}%` }} 
+                                        className="w-3 md:w-4 rounded-t bg-gradient-to-t from-amber-600 to-amber-400 group-hover:brightness-110 transition-all shadow-[0_0_8px_rgba(245,158,11,0.15)] group-hover:shadow-[0_0_12px_rgba(245,158,11,0.35)] duration-300 cursor-pointer"
+                                      />
+                                    </div>
+
+                                    {/* Month Label */}
+                                    <span className="text-[10px] text-slate-400 font-bold mt-2 group-hover:text-white transition-colors duration-200 uppercase tracking-wider">
+                                      {d.label}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminReportsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center relative" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo" />
+        <p className="text-slate-400 text-xs font-semibold tracking-widest mt-4 uppercase">
+          Syncing analytics structures...
+        </p>
+      </div>
+    }>
+      <AdminReportsContent />
+    </Suspense>
   );
 }
