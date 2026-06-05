@@ -200,8 +200,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const coachActions = [
     { name: 'Mark Attendance', href: '/admin/attendance', icon: Camera },
     { name: 'Scan Group Photo', href: '/admin/attendance/group-scan', icon: Camera },
-    { name: 'Apply Leave', href: '/admin/dashboard#leave-registry', icon: Calendar },
-    { name: 'Announcements', href: '/admin/dashboard#announcements-feed', icon: Megaphone },
   ];
 
   const hasPermission = (module: string, action: string) => {
@@ -233,6 +231,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(hasPermission('batches', 'view') ? [{ name: 'Batches', href: '/admin/batches', icon: Calendar }] : []),
     ...(isAdmin && hasPermission('coaches', 'view') ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
     ...(hasPermission('students', 'view') ? [{ name: 'Students', href: '/admin/students', icon: Users }] : []),
+    ...(isCoach ? [
+      { name: 'Leaves', href: '/admin/leaves', icon: Calendar },
+      { name: 'Announcements', href: '/admin/announcements', icon: Megaphone }
+    ] : []),
   ];
 
   const reportsSubItems = [
@@ -288,6 +290,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(profile?.role === 'superadmin' ? [{ name: 'Academies', href: '/admin/superadmin', icon: ShieldAlert }] : []),
     ...(isAdmin && hasPermission('roles', 'manage') ? [{ name: 'Roles & Permissions', href: '/admin/governance/roles', icon: Shield }] : []),
     ...(isAdmin && hasPermission('users', 'view') ? [{ name: 'User Directory', href: '/admin/governance/users', icon: Users }] : []),
+    ...(isAdmin ? [{ name: 'Leave Approvals', href: '/admin/leaves/approvals', icon: Calendar }] : []),
     ...(isAdmin && hasPermission('audit_logs', 'view') ? [{ name: 'Audit Logs', href: '/admin/governance/audit-logs', icon: History }] : []),
     ...(isAdmin && hasPermission('settings', 'manage')
       ? [{

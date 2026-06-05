@@ -20,7 +20,6 @@ import {
   User,
   Bell,
   BookOpen,
-  Briefcase,
   Activity,
   Building2,
   Globe,
@@ -150,6 +149,12 @@ interface FinePaymentItem {
   };
 }
 
+const getAttendanceColorClass = (rate: number) => {
+  if (rate >= 90) return 'text-emerald-400';
+  if (rate >= 80) return 'text-amber-400';
+  return 'text-rose-400';
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<KPIMetrics>({
@@ -215,7 +220,6 @@ export default function AdminDashboard() {
   const [attendancePendingCount, setAttendancePendingCount] = useState(0);
   const [coachMonthlyEarnings, setCoachMonthlyEarnings] = useState({ rate: 500, sessions: 0, total: 0 });
   const [coachAttendanceTrend, setCoachAttendanceTrend] = useState<any[]>([]);
-  const [coachLeaves, setCoachLeaves] = useState<any[]>([]);
   const [pendingJoinRequests, setPendingJoinRequests] = useState<any[]>([]);
 
   // Coach dashboard mockup visual states
@@ -244,8 +248,7 @@ export default function AdminDashboard() {
     { id: '2', title: 'Tournament Registration Open', timeLabel: '1 day ago' },
     { id: '3', title: 'Session Timing Update', timeLabel: '2 days ago' }
   ]);
-  const [isAddAnnouncementOpen, setIsAddAnnouncementOpen] = useState(false);
-  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+
 
   // Superadmin dashboard state
   const [saStats, setSaStats] = useState<any>({
@@ -293,54 +296,7 @@ export default function AdminDashboard() {
     }
   };
   
-  // Leave form state
-  const [leaveStart, setLeaveStart] = useState('');
-  const [leaveEnd, setLeaveEnd] = useState('');
-  const [leaveReason, setLeaveReason] = useState('');
-  const [applyingLeave, setApplyingLeave] = useState(false);
-
   const supabase = createBrowserClient();
-
-  const handleRequestLeave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!leaveStart || !leaveEnd || !leaveReason.trim()) return;
-    setApplyingLeave(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !profileData) return;
-      
-      const { error } = await supabase
-        .from('coach_leaves')
-        .insert({
-          coach_id: user.id,
-          tenant_id: profileData.tenant_id,
-          start_date: leaveStart,
-          end_date: leaveEnd,
-          reason: leaveReason,
-          status: 'Pending'
-        });
-        
-      if (error) throw error;
-      
-      setLeaveStart('');
-      setLeaveEnd('');
-      setLeaveReason('');
-      alert('Leave requested successfully!');
-      
-      // Reload leaves list
-      const { data: leaves } = await supabase
-        .from('coach_leaves')
-        .select('id, start_date, end_date, reason, status')
-        .eq('coach_id', user.id)
-        .order('start_date', { ascending: true });
-      setCoachLeaves(leaves || []);
-    } catch (err) {
-      console.error('Failed to request leave:', err);
-      alert('Failed to request leave.');
-    } finally {
-      setApplyingLeave(false);
-    }
-  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -772,12 +728,7 @@ export default function AdminDashboard() {
         setCoachNeedyStudentsList(needyStudents.slice(0, 5));
 
         // 7. Coach Leaves
-        const { data: leaves } = await supabase
-          .from('coach_leaves')
-          .select('id, start_date, end_date, reason, status')
-          .eq('coach_id', user.id)
-          .order('start_date', { ascending: true });
-        setCoachLeaves(leaves || []);
+        // Query removed as leaves are moved to a dedicated page
       }
 
       // 1. Fetch Today's Attendance Logs (Present / Absent)
@@ -1350,6 +1301,57 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('coach_announcements');
+      let list = [];
+      if (stored) {
+        list = JSON.parse(stored);
+      } else {
+        list = [
+          {
+            id: 'mock-1',
+            title: 'Badminton Tournament Registration Open',
+            status: 'Published',
+            dateLabel: 'Jun 2, 2026 • 09:00 AM'
+          },
+          {
+            id: 'mock-2',
+            title: 'Practice Match on Saturday',
+            status: 'Published',
+            dateLabel: 'May 31, 2026 • 06:30 PM'
+          },
+          {
+            id: 'mock-4',
+            title: 'New Training Shoes Recommended',
+            status: 'Published',
+            dateLabel: 'May 28, 2026 • 10:15 AM'
+          },
+          {
+            id: 'mock-7',
+            title: 'Weekly Schedule Update',
+            status: 'Published',
+            dateLabel: 'Jun 1, 2026 • 11:30 AM'
+          },
+          {
+            id: 'mock-8',
+            title: 'Friendly Tournament with Cyber Academy',
+            status: 'Published',
+            dateLabel: 'May 20, 2026 • 02:00 PM'
+          }
+        ];
+      }
+      const published = list
+        .filter((a: any) => a.status === 'Published')
+        .map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          timeLabel: a.dateLabel
+        }));
+      setCoachAnnouncements(published);
+    }
+  }, []);
+
   const handleApprovePayment = async (fineId: string) => {
     setActioningId(fineId);
     try {
@@ -1884,8 +1886,8 @@ export default function AdminDashboard() {
             </div>
             <div className="mt-3">
               <span className="text-2xl font-black text-white">{coachKPIs.todayClasses}</span>
-              <span className="text-[10px] text-purple-400 font-bold block mt-0.5">
-                {coachKPIs.classesCompleted} completed • {coachKPIs.classesUpcoming} upcoming
+              <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                <span className="text-emerald-400 font-extrabold">{coachKPIs.classesCompleted} completed</span> • {coachKPIs.classesUpcoming} upcoming
               </span>
             </div>
             {/* Wave Line SVG */}
@@ -1940,7 +1942,7 @@ export default function AdminDashboard() {
             </div>
             <div className="mt-3">
               <span className="text-2xl font-black text-white">{coachKPIs.presentToday}</span>
-              <span className="text-[10px] text-blue-400 font-bold block mt-0.5">
+              <span className={`text-[10px] font-bold block mt-0.5 ${getAttendanceColorClass(coachKPIs.attendanceRate)}`}>
                 {coachKPIs.attendanceRate}% attendance
               </span>
             </div>
@@ -1969,7 +1971,7 @@ export default function AdminDashboard() {
             <div className="mt-3">
               <span className="text-2xl font-black text-white">{coachKPIs.weeklySessions}</span>
               <span className="text-[10px] text-amber-400 font-bold block mt-0.5">
-                {coachKPIs.weeklyCompleted} completed • {coachKPIs.weeklyPending} pending
+                <span className="text-emerald-400 font-extrabold">{coachKPIs.weeklyCompleted} completed</span> • {coachKPIs.weeklyPending} pending
               </span>
             </div>
             {/* Wave Line SVG */}
@@ -2073,21 +2075,21 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Concentric Circle badge */}
-                        <div className="relative w-9 h-9 flex items-center justify-center shrink-0 bg-slate-900/60 rounded-full border border-white/5">
+                        <div className="relative w-9 h-9 flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-900/60 rounded-full border border-slate-200 dark:border-white/5">
                           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="2.5" />
+                            <circle cx="18" cy="18" r="15.915" fill="none" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="2.5" />
                             <circle
                               cx="18"
                               cy="18"
                               r="15.915"
                               fill="none"
-                              stroke={item.attendancePct >= 90 ? "#10b981" : item.attendancePct >= 80 ? "#3b82f6" : item.attendancePct > 0 ? "#ef4444" : "rgba(255,255,255,0.1)"}
+                              stroke={item.attendancePct >= 90 ? "#10b981" : item.attendancePct >= 80 ? "#f59e0b" : item.attendancePct > 0 ? "#ef4444" : "rgba(156,163,175,0.1)"}
                               strokeWidth="2.5"
                               strokeDasharray={`${item.attendancePct} ${100 - item.attendancePct}`}
                               strokeLinecap="round"
                             />
                           </svg>
-                          <span className="absolute text-[8px] font-black text-slate-300">{item.attendancePct}%</span>
+                          <span className={`absolute text-[8px] font-black ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</span>
                         </div>
                       </div>
                     </div>
@@ -2255,7 +2257,7 @@ export default function AdminDashboard() {
                       <td className="py-2.5 font-bold text-slate-200">{item.batchName}</td>
                       <td className="py-2.5 text-center text-slate-400 font-medium font-mono text-[10px]">{item.timeLabel}</td>
                       <td className="py-2.5 text-center text-slate-300 font-bold">{item.presentCount} / {item.totalCount}</td>
-                      <td className="py-2.5 text-right font-black text-[11px] text-emerald-400 font-mono">{item.attendancePct}%</td>
+                      <td className={`py-2.5 text-right font-black text-[11px] font-mono ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2330,6 +2332,12 @@ export default function AdminDashboard() {
                 <h3 className="text-xs font-bold text-white tracking-tight flex items-center gap-1.5">
                   <Bell className="w-3.5 h-3.5 text-indigo-400" /> Announcements
                 </h3>
+                <Link
+                  href="/admin/announcements"
+                  className="text-[9px] font-extrabold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider animate-in fade-in"
+                >
+                  Manage
+                </Link>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pt-3 pr-1 no-scrollbar">
                 {coachAnnouncements.map((item: any) => (
@@ -2369,17 +2377,14 @@ export default function AdminDashboard() {
                   <span className="text-[10px] font-bold text-slate-300">Scan Group Photo</span>
                 </button>
                 <button
-                  onClick={() => {
-                    const leaveEl = document.getElementById('leave-registry');
-                    if (leaveEl) leaveEl.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                  onClick={() => router.push('/admin/leaves')}
                   className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
                 >
                   <Calendar className="w-5 h-5 text-emerald-400/90 group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] font-bold text-slate-300">Apply Leave</span>
                 </button>
                 <button
-                  onClick={() => setIsAddAnnouncementOpen(true)}
+                  onClick={() => router.push('/admin/announcements')}
                   className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
                 >
                   <Megaphone className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
@@ -2390,168 +2395,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Leave Registry */}
-        <div id="leave-registry" className="glass-panel p-6 rounded-3xl mt-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-indigo-400" /> Leave Registry & Request Center
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">Submit time-off requests and track approval statuses in real-time</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            <div className="lg:col-span-3 space-y-4">
-              <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">Leave Request History</h3>
-              <div className="overflow-x-auto rounded-xl border border-white/5">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.02] text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">
-                      <th className="py-3 px-4">Reason</th>
-                      <th className="py-3 px-4">Dates Range</th>
-                      <th className="py-3 px-4 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-xs">
-                    {coachLeaves.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="py-6 text-center text-slate-500 italic">No leave request logs found.</td>
-                      </tr>
-                    ) : (
-                      coachLeaves.map((l) => (
-                        <tr key={l.id} className="hover:bg-white/[0.01] transition-colors">
-                          <td className="py-3 px-4 font-semibold text-slate-300">{l.reason}</td>
-                          <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
-                            {new Date(l.start_date).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})} - {new Date(l.end_date).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold border uppercase inline-block
-                              ${l.status === 'Approved' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : l.status === 'Rejected' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'}`}>
-                              {l.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div className="lg:col-span-2 bg-white/[0.01] p-5 rounded-2xl border border-white/5 space-y-4">
-              <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">File New Leave Request</h3>
-              <form onSubmit={handleRequestLeave} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Start Date</label>
-                    <input
-                      type="date"
-                      required
-                      value={leaveStart}
-                      onChange={(e) => setLeaveStart(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl glass-input text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">End Date</label>
-                    <input
-                      type="date"
-                      required
-                      value={leaveEnd}
-                      onChange={(e) => setLeaveEnd(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl glass-input text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Detailed Reason</label>
-                  <textarea
-                    required
-                    value={leaveReason}
-                    onChange={(e) => setLeaveReason(e.target.value)}
-                    placeholder="Describe reason for leave (e.g. medical emergency, scheduled tournament travel)..."
-                    rows={3}
-                    className="w-full p-3 rounded-xl glass-input text-xs"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={applyingLeave || !leaveStart || !leaveEnd || !leaveReason.trim()}
-                  className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed glow-indigo"
-                >
-                  {applyingLeave ? 'Submitting Leave Request...' : 'File Leave Request'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
 
-        {/* Modal: Add Announcement */}
-        {isAddAnnouncementOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-md glass-panel p-6 rounded-3xl space-y-4 relative">
-              <button
-                onClick={() => {
-                  setIsAddAnnouncementOpen(false);
-                  setNewAnnouncementTitle('');
-                }}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
-              >
-                ×
-              </button>
-              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Megaphone className="w-4 h-4 text-indigo-400" /> Create Academy Announcement
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Publish a new announcement for students and parents. This announcement will appear on the academy dashboard feeds.
-              </p>
-              
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Announcement Title / message</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={newAnnouncementTitle}
-                  onChange={(e) => setNewAnnouncementTitle(e.target.value)}
-                  placeholder="e.g. Session Timing Update: Evening batches will start 15 mins earlier from next week."
-                  className="w-full p-3 rounded-xl glass-input text-xs"
-                />
-              </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setIsAddAnnouncementOpen(false);
-                    setNewAnnouncementTitle('');
-                  }}
-                  className="btn-secondary h-9 px-4 rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!newAnnouncementTitle.trim()) return;
-                    setCoachAnnouncements([
-                      {
-                        id: Date.now().toString(),
-                        title: newAnnouncementTitle,
-                        timeLabel: 'Just now'
-                      },
-                      ...coachAnnouncements
-                    ]);
-                    setIsAddAnnouncementOpen(false);
-                    setNewAnnouncementTitle('');
-                  }}
-                  disabled={!newAnnouncementTitle.trim()}
-                  className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer glow-indigo disabled:opacity-40"
-                >
-                  Publish Announcement
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
     );
   }
@@ -2700,10 +2546,21 @@ export default function AdminDashboard() {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-black text-white">{adminKPIs.todayClasses}</span>
-            <span className="text-[10px] text-amber-400 font-bold block mt-0.5">
-              {adminKPIs.classesCompleted} completed • {adminKPIs.classesRemaining} remaining
+            <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+              <span className="text-emerald-400 font-extrabold">{adminKPIs.classesCompleted} completed</span> • {adminKPIs.classesRemaining} remaining
             </span>
           </div>
+          {/* Wave Line SVG */}
+          <svg viewBox="0 0 100 28" className="absolute bottom-0 left-0 w-full h-7 pointer-events-none opacity-40">
+            <defs>
+              <linearGradient id="waveGrad-amber" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path d="M0,22 C15,12 30,25 45,18 C60,10 75,22 90,15 L100,28 L0,28 Z" fill="url(#waveGrad-amber)" />
+            <path d="M0,22 C15,12 30,25 45,18 C60,10 75,22 90,15" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
+          </svg>
         </div>
 
         {/* Card 5: Today's Attendance */}
@@ -2716,7 +2573,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-white">{adminKPIs.todayAttendanceRate}%</span>
+            <span className={`text-2xl font-black ${getAttendanceColorClass(adminKPIs.todayAttendanceRate)}`}>{adminKPIs.todayAttendanceRate}%</span>
             <span className="text-[10px] text-rose-400 font-bold block mt-0.5">
               Present: {adminKPIs.presentToday} | Absent: {adminKPIs.absentToday}
             </span>
