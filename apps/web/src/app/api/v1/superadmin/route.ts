@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
     const totalLogs = logs?.length || 0;
     const presentLogs = logs?.filter((l: any) => l.status === 'present' || l.status === 'late').length || 0;
-    const avgAttendance = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 92; // default to 92 if no logs yet
+    const avgAttendance = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 0; // default to 0 if no logs yet
 
     // 4. Fetch linked tenant owners admins
     const { data: adminsList, error: adminsErr } = await db
@@ -108,7 +108,7 @@ export async function GET(req: Request) {
       const cCount = coachMap[t.id] || 0;
       const bCount = batchMap[t.id] || 0;
       const logInfo = logsMap[t.id] || { total: 0, present: 0 };
-      const attPct = logInfo.total > 0 ? Math.round((logInfo.present / logInfo.total) * 100) : 92;
+      const attPct = logInfo.total > 0 ? Math.round((logInfo.present / logInfo.total) * 100) : 0;
       const pFees = finesMap[t.id] || 0;
 
       return {
@@ -192,20 +192,12 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(6);
 
-    const fallbackActivities = [
-      { id: 'fb-1', action: 'System Active', description: 'Platform online and operational', created_at: new Date().toISOString() },
-      { id: 'fb-2', action: 'Seed Data Verified', description: 'Database configuration verified', created_at: new Date(Date.now() - 3600000).toISOString() }
-    ];
-
-    const recentActivity = [
-      ...(realLogs || []).map((l: any) => ({
-        id: l.id,
-        action: l.action,
-        description: l.description,
-        created_at: l.created_at
-      })),
-      ...fallbackActivities
-    ].slice(0, 6);
+    const recentActivity = (realLogs || []).map((l: any) => ({
+      id: l.id,
+      action: l.action,
+      description: l.description,
+      created_at: l.created_at
+    }));
 
     // 12. Calculate Dynamic Action Required Alerts
     const pendingFeesCount = realTenants.filter((t: any) => (finesMap[t.id] || 0) > 0).length;

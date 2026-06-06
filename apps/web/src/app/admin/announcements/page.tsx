@@ -39,118 +39,7 @@ const getAttendanceColorClass = (rate: number) => {
   return 'text-rose-400';
 };
 
-const defaultAnnouncementsList: Announcement[] = [
-  {
-    id: 'mock-1',
-    title: 'Badminton Tournament Registration Open',
-    message: 'Registration for the Inter-Academy Badminton Tournament is now open. Last date to register is June 10, 2026.',
-    status: 'Published',
-    category: 'General',
-    dateLabel: 'Jun 2, 2026 • 09:00 AM',
-    audience: 'All Students',
-    iconType: 'megaphone'
-  },
-  {
-    id: 'mock-2',
-    title: 'Practice Match on Saturday',
-    message: 'Friendly practice match for advanced students this Saturday at 7:00 AM in Court 2.',
-    status: 'Published',
-    category: 'Badminton A',
-    dateLabel: 'May 31, 2026 • 06:30 PM',
-    audience: 'Badminton A',
-    iconType: 'trophy'
-  },
-  {
-    id: 'mock-3',
-    title: 'Summer Camp Schedule',
-    message: 'Special summer camp starts from June 15. Timings: 6:00 AM - 8:00 AM.',
-    status: 'Scheduled',
-    category: 'All Batches',
-    dateLabel: 'Jun 8, 2026 • 08:00 AM',
-    audience: 'All Students',
-    iconType: 'calendar'
-  },
-  {
-    id: 'mock-4',
-    title: 'New Training Shoes Recommended',
-    message: 'Please ensure you have non-marking shoes for better court grip and injury prevention.',
-    status: 'Published',
-    category: 'General',
-    dateLabel: 'May 28, 2026 • 10:15 AM',
-    audience: 'All Students',
-    iconType: 'activity'
-  },
-  {
-    id: 'mock-5',
-    title: 'Court Closed on June 6',
-    message: 'The badminton courts will remain closed on June 6 (Saturday) due to maintenance.',
-    status: 'Archived',
-    category: 'All Batches',
-    dateLabel: 'May 25, 2026 • 04:45 PM',
-    audience: 'All Students',
-    iconType: 'ban'
-  },
-  {
-    id: 'mock-6',
-    title: 'Monsoon Camp Registrations',
-    message: 'Monsoon Batch admissions are now open. Enroll before June 20 to lock in special slot timings.',
-    status: 'Scheduled',
-    category: 'General',
-    dateLabel: 'Jun 12, 2026 • 10:00 AM',
-    audience: 'All Students',
-    iconType: 'calendar'
-  },
-  {
-    id: 'mock-7',
-    title: 'Weekly Schedule Update',
-    message: 'We have slightly shifted the batch timings for advanced squads to optimize court utilization.',
-    status: 'Published',
-    category: 'All Batches',
-    dateLabel: 'Jun 1, 2026 • 11:30 AM',
-    audience: 'All Students',
-    iconType: 'calendar'
-  },
-  {
-    id: 'mock-8',
-    title: 'Friendly Tournament with Cyber Academy',
-    message: 'Cyber Academy badminton team will be visiting us for friendly fixtures. All advanced students are invited.',
-    status: 'Published',
-    category: 'Badminton A',
-    dateLabel: 'May 20, 2026 • 02:00 PM',
-    audience: 'Badminton A',
-    iconType: 'trophy'
-  },
-  {
-    id: 'mock-9',
-    title: 'Nutrition Seminar by Dr. Verma',
-    message: 'A session on sports nutrition and player wellness for young athletes. Parents are welcome to attend.',
-    status: 'Archived',
-    category: 'General',
-    dateLabel: 'May 10, 2026 • 05:00 PM',
-    audience: 'All Students',
-    iconType: 'activity'
-  },
-  {
-    id: 'mock-10',
-    title: 'Academy Fees Due Notice',
-    message: 'A friendly reminder to complete pending monthly fee collections for the month of May.',
-    status: 'Archived',
-    category: 'General',
-    dateLabel: 'May 15, 2026 • 09:00 AM',
-    audience: 'All Students',
-    iconType: 'megaphone'
-  },
-  {
-    id: 'mock-11',
-    title: 'Special Holiday Notice',
-    message: 'All sessions are suspended for the national holiday. Enjoy your time off!',
-    status: 'Archived',
-    category: 'All Batches',
-    dateLabel: 'May 1, 2026 • 08:00 AM',
-    audience: 'All Students',
-    iconType: 'ban'
-  }
-];
+
 
 export default function AnnouncementsPage() {
   const router = useRouter();
@@ -172,8 +61,7 @@ export default function AnnouncementsPage() {
       if (stored) {
         setAnnouncements(JSON.parse(stored));
       } else {
-        setAnnouncements(defaultAnnouncementsList);
-        localStorage.setItem('coach_announcements', JSON.stringify(defaultAnnouncementsList));
+        setAnnouncements([]);
       }
     }
 

@@ -129,14 +129,14 @@ interface MapCityItem {
 export default function SuperadminPage() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'provision' | 'governance'>('analytics');
   const [stats, setStats] = useState<SuperadminStats>({
-    totalTenants: 25,
-    studentsCount: 12450,
-    coachesCount: 425,
-    adminsCount: 38,
-    activeBatches: 620,
-    todaysClasses: 180,
-    avgAttendance: 92,
-    pendingFees: 850000
+    totalTenants: 0,
+    studentsCount: 0,
+    coachesCount: 0,
+    adminsCount: 0,
+    activeBatches: 0,
+    todaysClasses: 0,
+    avgAttendance: 0,
+    pendingFees: 0
   });
   const [growth, setGrowth] = useState<{ studentGrowth: GrowthMetric[]; academyGrowth: GrowthMetric[] }>({
     studentGrowth: [],

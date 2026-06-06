@@ -243,23 +243,19 @@ export default function AdminDashboard() {
   const [coachPendingFeesList, setCoachPendingFeesList] = useState<any[]>([]);
   const [coachRecentAttendanceList, setCoachRecentAttendanceList] = useState<any[]>([]);
   const [coachNeedyStudentsList, setCoachNeedyStudentsList] = useState<any[]>([]);
-  const [coachAnnouncements, setCoachAnnouncements] = useState<any[]>([
-    { id: '1', title: 'Court maintenance on June 6 (Saturday)', timeLabel: '2 hours ago' },
-    { id: '2', title: 'Tournament Registration Open', timeLabel: '1 day ago' },
-    { id: '3', title: 'Session Timing Update', timeLabel: '2 days ago' }
-  ]);
+  const [coachAnnouncements, setCoachAnnouncements] = useState<any[]>([]);
 
 
   // Superadmin dashboard state
   const [saStats, setSaStats] = useState<any>({
-    totalTenants: 25,
-    studentsCount: 12450,
-    coachesCount: 425,
-    adminsCount: 38,
-    activeBatches: 620,
-    todaysClasses: 180,
-    avgAttendance: 92,
-    pendingFees: 850000
+    totalTenants: 0,
+    studentsCount: 0,
+    coachesCount: 0,
+    adminsCount: 0,
+    activeBatches: 0,
+    todaysClasses: 0,
+    avgAttendance: 0,
+    pendingFees: 0
   });
   const [saGrowth, setSaGrowth] = useState<any>({
     studentGrowth: [],
@@ -364,15 +360,15 @@ export default function AdminDashboard() {
         }
         setCoachStudents(studentsList);
 
-        // A. Load hourly rate
+        // A. Load hourly rate from coach_financial_settings
         let hourlyRate = 500;
-        const { data: coachProf } = await supabase
-          .from('coaches')
-          .select('hourly_rate')
-          .eq('id', user.id)
+        const { data: coachFin } = await supabase
+          .from('coach_financial_settings')
+          .select('per_class_rate')
+          .eq('coach_id', user.id)
           .single();
-        if (coachProf?.hourly_rate) {
-          hourlyRate = coachProf.hourly_rate;
+        if (coachFin?.per_class_rate) {
+          hourlyRate = Number(coachFin.per_class_rate);
         }
 
         // B. Query Today's Attendance Logs for these batches
@@ -465,18 +461,18 @@ export default function AdminDashboard() {
           : 0;
 
         const finalKPIs = {
-          todayClasses: totalTodayClasses || 3,
-          classesCompleted: totalTodayClasses ? completedTodayClasses : 2,
-          classesUpcoming: totalTodayClasses ? upcomingTodayClasses : 1,
-          totalStudents: studentsList.length || 78,
-          presentToday: totalTodayClasses ? presentTodayCount : 68,
-          absentToday: totalTodayClasses ? absentTodayCount : 10,
-          attendanceRate: totalTodayClasses ? calculatedAttendanceRate : 87,
-          absentRate: totalTodayClasses ? calculatedAbsentRate : 13,
-          weeklySessions: weeklyScheduledVal || 12,
-          weeklyCompleted: weeklyCompletedVal || 8,
-          weeklyPending: weeklyPendingVal || 4,
-          monthlyEarnings: monthlyEarningsVal || 17500
+          todayClasses: totalTodayClasses,
+          classesCompleted: completedTodayClasses,
+          classesUpcoming: upcomingTodayClasses,
+          totalStudents: studentsList.length,
+          presentToday: presentTodayCount,
+          absentToday: absentTodayCount,
+          attendanceRate: calculatedAttendanceRate,
+          absentRate: calculatedAbsentRate,
+          weeklySessions: weeklyScheduledVal,
+          weeklyCompleted: weeklyCompletedVal,
+          weeklyPending: weeklyPendingVal,
+          monthlyEarnings: monthlyEarningsVal
         };
         setCoachKPIs(finalKPIs);
 
@@ -510,13 +506,7 @@ export default function AdminDashboard() {
           });
         }
 
-        if (scheduleList.length === 0) {
-          scheduleList.push(
-            { id: 'mock-1', startTime: '05:30:00', endTime: '06:30:00', batchName: 'Badminton A', className: 'Badminton', courtName: 'Indoor Court 1', presentCount: 28, totalCount: 30, attendancePct: 93, status: 'Completed' },
-            { id: 'mock-2', startTime: '06:30:00', endTime: '07:30:00', batchName: 'Badminton B', className: 'Badminton', courtName: 'Indoor Court 2', presentCount: 24, totalCount: 28, attendancePct: 86, status: 'Completed' },
-            { id: 'mock-3', startTime: '19:00:00', endTime: '20:00:00', batchName: 'Badminton C', className: 'Badminton', courtName: 'Indoor Court 1', presentCount: null, totalCount: 20, attendancePct: 0, status: 'Upcoming' }
-          );
-        }
+
         scheduleList.sort((a, b) => a.startTime.localeCompare(b.startTime));
         setCoachTodayScheduleList(scheduleList);
 
@@ -562,9 +552,8 @@ export default function AdminDashboard() {
             d.setDate(now.getDate() - i);
             daysLabels.push(d.toLocaleDateString('default', { month: 'short', day: 'numeric' }));
           }
-          const mockRates = [88, 92, 85, 90, 91, 87, 87];
           for (let i = 0; i < 7; i++) {
-            trendPoints.push({ label: daysLabels[i], rate: mockRates[i] });
+            trendPoints.push({ label: daysLabels[i], rate: 0 });
           }
         }
         setCoachAttendanceChartPoints(trendPoints);
@@ -595,15 +584,7 @@ export default function AdminDashboard() {
           });
         }
 
-        if (pendingFeesList.length === 0) {
-          pendingFeesList.push(
-            { id: 'f-1', name: 'Aarav Sharma', batchName: 'Badminton A', avatarUrl: null, dueDate: new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000), amount: 1500 },
-            { id: 'f-2', name: 'Rohan Verma', batchName: 'Badminton B', avatarUrl: null, dueDate: new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000), amount: 2000 },
-            { id: 'f-3', name: 'Sneha Pillai', batchName: 'Badminton C', avatarUrl: null, dueDate: new Date(now.getTime() + 13 * 24 * 60 * 60 * 1000), amount: 1500 },
-            { id: 'f-4', name: 'Vihaan Patel', batchName: 'Badminton A', avatarUrl: null, dueDate: new Date(now.getTime() + 17 * 24 * 60 * 60 * 1000), amount: 1000 },
-            { id: 'f-5', name: 'Karan Mehta', batchName: 'Badminton B', avatarUrl: null, dueDate: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000), amount: 1500 }
-          );
-        }
+
         setCoachPendingFeesList(pendingFeesList);
 
         // I. Recent Attendance (Last 5 Sessions)
@@ -662,15 +643,7 @@ export default function AdminDashboard() {
           });
         }
 
-        if (recentAttendance.length === 0) {
-          recentAttendance.push(
-            { batchName: 'Badminton A', timeLabel: 'Today, 5:30 AM', presentCount: 28, totalCount: 30, attendancePct: 93 },
-            { batchName: 'Badminton B', timeLabel: 'Today, 6:30 AM', presentCount: 24, totalCount: 28, attendancePct: 86 },
-            { batchName: 'Badminton C', timeLabel: 'Jun 3, 7:00 PM', presentCount: 17, totalCount: 20, attendancePct: 85 },
-            { batchName: 'Badminton A', timeLabel: 'Jun 3, 5:30 AM', presentCount: 26, totalCount: 30, attendancePct: 87 },
-            { batchName: 'Badminton B', timeLabel: 'Jun 2, 6:30 AM', presentCount: 25, totalCount: 28, attendancePct: 89 }
-          );
-        }
+
         setCoachRecentAttendanceList(recentAttendance.slice(0, 5));
 
         // J. Students Needing Attention (Count absents in the last 30 days)
@@ -716,15 +689,7 @@ export default function AdminDashboard() {
           needyStudents.sort((a, b) => b.absentCount - a.absentCount);
         }
 
-        if (needyStudents.length === 0) {
-          needyStudents.push(
-            { id: 's-1', name: 'Rohan Verma', batchName: 'Badminton B', avatarUrl: null, absentCount: 2, lastAbsentLabel: 'Jun 3' },
-            { id: 's-2', name: 'Sneha Pillai', batchName: 'Badminton C', avatarUrl: null, absentCount: 2, lastAbsentLabel: 'Jun 2' },
-            { id: 's-3', name: 'Vihaan Patel', batchName: 'Badminton A', avatarUrl: null, absentCount: 1, lastAbsentLabel: 'Jun 4' },
-            { id: 's-4', name: 'Karan Mehta', batchName: 'Badminton B', avatarUrl: null, absentCount: 1, lastAbsentLabel: 'Jun 3' },
-            { id: 's-5', name: 'Aaditya Singh', batchName: 'Badminton C', avatarUrl: null, absentCount: 1, lastAbsentLabel: 'Jun 1' }
-          );
-        }
+
         setCoachNeedyStudentsList(needyStudents.slice(0, 5));
 
         // 7. Coach Leaves
@@ -1307,39 +1272,6 @@ export default function AdminDashboard() {
       let list = [];
       if (stored) {
         list = JSON.parse(stored);
-      } else {
-        list = [
-          {
-            id: 'mock-1',
-            title: 'Badminton Tournament Registration Open',
-            status: 'Published',
-            dateLabel: 'Jun 2, 2026 • 09:00 AM'
-          },
-          {
-            id: 'mock-2',
-            title: 'Practice Match on Saturday',
-            status: 'Published',
-            dateLabel: 'May 31, 2026 • 06:30 PM'
-          },
-          {
-            id: 'mock-4',
-            title: 'New Training Shoes Recommended',
-            status: 'Published',
-            dateLabel: 'May 28, 2026 • 10:15 AM'
-          },
-          {
-            id: 'mock-7',
-            title: 'Weekly Schedule Update',
-            status: 'Published',
-            dateLabel: 'Jun 1, 2026 • 11:30 AM'
-          },
-          {
-            id: 'mock-8',
-            title: 'Friendly Tournament with Cyber Academy',
-            status: 'Published',
-            dateLabel: 'May 20, 2026 • 02:00 PM'
-          }
-        ];
       }
       const published = list
         .filter((a: any) => a.status === 'Published')
@@ -2038,64 +1970,71 @@ export default function AdminDashboard() {
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar relative pl-4">
               <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-white/5 pointer-events-none" />
 
-              {coachTodayScheduleList.map((item, idx) => {
-                let pillColor = 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400';
-                let dotColor = 'bg-indigo-500 ring-indigo-500/20';
-                if (item.status === 'Completed') {
-                  pillColor = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
-                  dotColor = 'bg-emerald-500 ring-emerald-500/20';
-                } else if (item.status === 'Ongoing') {
-                  pillColor = 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse';
-                  dotColor = 'bg-rose-500 ring-rose-500/20 animate-ping';
-                }
-                
-                const timeLabel = formatTime12h(item.startTime) && formatTime12h(item.endTime)
-                  ? `${formatTime12h(item.startTime)} - ${formatTime12h(item.endTime)}`
-                  : `${item.startTime.slice(0, 5)} - ${item.endTime.slice(0, 5)}`;
+              {coachTodayScheduleList.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center py-16">
+                  <Calendar className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                  <p className="text-xs">No classes scheduled for today.</p>
+                </div>
+              ) : (
+                coachTodayScheduleList.map((item, idx) => {
+                  let pillColor = 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400';
+                  let dotColor = 'bg-indigo-500 ring-indigo-500/20';
+                  if (item.status === 'Completed') {
+                    pillColor = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+                    dotColor = 'bg-emerald-500 ring-emerald-500/20';
+                  } else if (item.status === 'Ongoing') {
+                    pillColor = 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse';
+                    dotColor = 'bg-rose-500 ring-rose-500/20 animate-ping';
+                  }
+                  
+                  const timeLabel = formatTime12h(item.startTime) && formatTime12h(item.endTime)
+                    ? `${formatTime12h(item.startTime)} - ${formatTime12h(item.endTime)}`
+                    : `${item.startTime.slice(0, 5)} - ${item.endTime.slice(0, 5)}`;
 
-                return (
-                  <div key={item.id || idx} className="flex gap-4 items-center group relative pl-3">
-                    <div className={`absolute left-[-13px] w-2.5 h-2.5 rounded-full ${dotColor} ring-4 mt-0.5 shrink-0`} />
-                    
-                    <div className="flex-1 flex items-center justify-between bg-white/[0.01] border border-white/5 p-3 rounded-xl hover:bg-white/[0.03] transition-colors">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 block font-mono">{timeLabel}</span>
-                        <h4 className="text-xs font-bold text-slate-200">{item.className} {item.batchName.includes(item.className) ? '' : item.batchName}</h4>
-                        <span className="text-[10px] text-slate-500 font-semibold block">{item.courtName}</span>
-                      </div>
+                  return (
+                    <div key={item.id || idx} className="flex gap-4 items-center group relative pl-3">
+                      <div className={`absolute left-[-13px] w-2.5 h-2.5 rounded-full ${dotColor} ring-4 mt-0.5 shrink-0`} />
                       
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-[10px] font-bold text-slate-300 block">
-                            {item.presentCount !== null ? `${item.presentCount} / ${item.totalCount} Present` : `-- / ${item.totalCount} Present`}
-                          </span>
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mt-1 ${pillColor}`}>
-                            {item.status}
-                          </span>
+                      <div className="flex-1 flex items-center justify-between bg-white/[0.01] border border-white/5 p-3 rounded-xl hover:bg-white/[0.03] transition-colors">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-bold text-slate-400 block font-mono">{timeLabel}</span>
+                          <h4 className="text-xs font-bold text-slate-200">{item.className} {item.batchName.includes(item.className) ? '' : item.batchName}</h4>
+                          <span className="text-[10px] text-slate-500 font-semibold block">{item.courtName}</span>
                         </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-slate-300 block">
+                              {item.presentCount !== null ? `${item.presentCount} / ${item.totalCount} Present` : `-- / ${item.totalCount} Present`}
+                            </span>
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mt-1 ${pillColor}`}>
+                              {item.status}
+                            </span>
+                          </div>
 
-                        {/* Concentric Circle badge */}
-                        <div className="relative w-9 h-9 flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-900/60 rounded-full border border-slate-200 dark:border-white/5">
-                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="15.915" fill="none" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="2.5" />
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="15.915"
-                              fill="none"
-                              stroke={item.attendancePct >= 90 ? "#10b981" : item.attendancePct >= 80 ? "#f59e0b" : item.attendancePct > 0 ? "#ef4444" : "rgba(156,163,175,0.1)"}
-                              strokeWidth="2.5"
-                              strokeDasharray={`${item.attendancePct} ${100 - item.attendancePct}`}
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <span className={`absolute text-[8px] font-black ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</span>
+                          {/* Concentric Circle badge */}
+                          <div className="relative w-9 h-9 flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-900/60 rounded-full border border-slate-200 dark:border-white/5">
+                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                              <circle cx="18" cy="18" r="15.915" fill="none" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="2.5" />
+                              <circle
+                                cx="18"
+                                cy="18"
+                                r="15.915"
+                                fill="none"
+                                stroke={item.attendancePct >= 90 ? "#10b981" : item.attendancePct >= 80 ? "#f59e0b" : item.attendancePct > 0 ? "#ef4444" : "rgba(156,163,175,0.1)"}
+                                strokeWidth="2.5"
+                                strokeDasharray={`${item.attendancePct} ${100 - item.attendancePct}`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className={`absolute text-[8px] font-black ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -2252,14 +2191,20 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-xs">
-                  {coachRecentAttendanceList.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="py-2.5 font-bold text-slate-200">{item.batchName}</td>
-                      <td className="py-2.5 text-center text-slate-400 font-medium font-mono text-[10px]">{item.timeLabel}</td>
-                      <td className="py-2.5 text-center text-slate-300 font-bold">{item.presentCount} / {item.totalCount}</td>
-                      <td className={`py-2.5 text-right font-black text-[11px] font-mono ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</td>
+                  {coachRecentAttendanceList.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-500 italic">No attendance records found.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    coachRecentAttendanceList.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
+                        <td className="py-2.5 font-bold text-slate-200">{item.batchName}</td>
+                        <td className="py-2.5 text-center text-slate-400 font-medium font-mono text-[10px]">{item.timeLabel}</td>
+                        <td className="py-2.5 text-center text-slate-300 font-bold">{item.presentCount} / {item.totalCount}</td>
+                        <td className={`py-2.5 text-right font-black text-[11px] font-mono ${getAttendanceColorClass(item.attendancePct)}`}>{item.attendancePct}%</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2291,27 +2236,34 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar">
-              {coachNeedyStudentsList.map((item, idx) => (
-                <div key={item.id || idx} className="p-3 rounded-xl bg-white/[0.01] border border-white/5 flex items-center justify-between hover:bg-white/[0.03] transition-all">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-extrabold text-xs shrink-0">
-                      {item.name.split(' ').map((n: string) => n[0]).join('')}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-slate-200 truncate">{item.name}</h4>
-                      <span className="text-[10px] text-slate-500 block truncate">{item.batchName}</span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0 flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-[9px]">
-                      {item.absentCount} Absent
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-semibold block">
-                      Last absent: {item.lastAbsentLabel}
-                    </span>
-                  </div>
+              {coachNeedyStudentsList.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center p-6 py-12">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400/30 mb-2 mx-auto" />
+                  <p className="text-xs">All students are attending regularly.</p>
                 </div>
-              ))}
+              ) : (
+                coachNeedyStudentsList.map((item, idx) => (
+                  <div key={item.id || idx} className="p-3 rounded-xl bg-white/[0.01] border border-white/5 flex items-center justify-between hover:bg-white/[0.03] transition-all">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-extrabold text-xs shrink-0">
+                        {item.name.split(' ').map((n: string) => n[0]).join('')}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-200 truncate">{item.name}</h4>
+                        <span className="text-[10px] text-slate-500 block truncate">{item.batchName}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 flex items-center gap-3">
+                      <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-[9px]">
+                        {item.absentCount} Absent
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-semibold block">
+                        Last absent: {item.lastAbsentLabel}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="border-t border-white/5 pt-3 text-center flex-shrink-0">
@@ -2340,17 +2292,24 @@ export default function AdminDashboard() {
                 </Link>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pt-3 pr-1 no-scrollbar">
-                {coachAnnouncements.map((item: any) => (
-                  <div key={item.id} className="flex gap-3 text-xs items-start">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
-                      <Megaphone className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-slate-200 leading-tight">{item.title}</h4>
-                      <span className="text-[9px] text-slate-500 block mt-1">{item.timeLabel}</span>
-                    </div>
+                {coachAnnouncements.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center py-6">
+                    <Bell className="w-6 h-6 text-slate-600 mb-1" />
+                    <p className="text-[11px]">No announcements posted yet.</p>
                   </div>
-                ))}
+                ) : (
+                  coachAnnouncements.map((item: any) => (
+                    <div key={item.id} className="flex gap-3 text-xs items-start">
+                      <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                        <Megaphone className="w-3 h-3" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-200 leading-tight">{item.title}</h4>
+                        <span className="text-[9px] text-slate-500 block mt-1">{item.timeLabel}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
