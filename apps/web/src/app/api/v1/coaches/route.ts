@@ -98,6 +98,14 @@ export async function POST(req: Request) {
       throw authError;
     }
 
+    // Fetch the global Coach role ID
+    const { data: coachRole } = await db
+      .from('roles')
+      .select('id')
+      .eq('name', 'Coach')
+      .is('tenant_id', null)
+      .maybeSingle();
+
     const userId = authData.user.id;
 
     // 2. Insert users profile row (Coaches require admin document verification before activation)
@@ -106,6 +114,8 @@ export async function POST(req: Request) {
       tenant_id: effectiveTenantId,
       email,
       role: 'coach',
+      role_id: coachRole?.id || null,
+      available_roles: ['coach'],
       first_name: firstName,
       last_name: lastName,
       phone: phone ?? null,
@@ -251,10 +261,22 @@ export async function PUT(req: Request) {
         }
       }
 
+      // Fetch the global Coach role ID
+      const { data: coachRole } = await db
+        .from('roles')
+        .select('id')
+        .eq('name', 'Coach')
+        .is('tenant_id', null)
+        .maybeSingle();
+
       // Update role to 'coach' in public.users
       const { error: userErr } = await db
         .from('users')
-        .update({ is_active: true, role: 'coach' })
+        .update({ 
+          is_active: true, 
+          role: 'coach',
+          role_id: coachRole?.id || null
+        })
         .eq('id', coachId);
       if (userErr) throw userErr;
 
