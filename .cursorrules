@@ -11,6 +11,7 @@ Whenever making code changes in this project, adhere to the following checklist 
   - Coach
   - Student
 - **UI States**: Verify loading, empty, and error states for all components and pages.
+- **Preferences**: Persist user preferences.
 - **Regressions**: Proactively report any UI or functional regressions before completing a task.
 
 ## Styling Rules
