@@ -33,7 +33,16 @@ import {
   ShieldAlert,
   FileCheck,
   Activity,
-  Link2
+  Link2,
+  User,
+  Phone,
+  Mail,
+  Lock,
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase';
 import CustomSelect from '../components/CustomSelect';
@@ -62,7 +71,7 @@ interface CoachItem {
     state: string | null;
     city: string | null;
     area: string | null;
-    employment_status: string;
+    account_status: string;
     public_profile_slug: string | null;
     achievements: string[];
     gallery_urls: string[];
@@ -137,6 +146,31 @@ const DAY_LABELS: Record<number, string> = {
   1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
 };
 
+const ONBOARD_STEPS = [
+  { id: 1, name: 'Personal Information', desc: 'Basic details' },
+  { id: 2, name: 'Professional Profile', desc: 'Skills & experience' },
+  { id: 3, name: 'Location', desc: 'Where they are based' },
+  { id: 4, name: 'Account Security', desc: 'Verification settings' },
+  { id: 5, name: 'Review & Submit', desc: 'Verify and onboard' },
+];
+
+const SPECIALIZATIONS_ONBOARD = [
+  'Singles', 'Doubles', 'Mixed Doubles', 'Coaching', 'Physical Training', 
+  'Tactics', 'Advanced Techniques', 'Beginner Basics'
+];
+
+const SERVICE_TYPES_ONBOARD = [
+  'Personal Training', 'Group Training', 'Online Coaching', 'Offline Coaching'
+];
+
+const CLASS_TYPES_ONBOARD = [
+  'Regular Classes', 'Crash Course', 'Tournament Coaching', 'Summer Camp'
+];
+
+const LANGUAGES_ONBOARD = [
+  'English', 'Hindi', 'Kannada', 'Telugu', 'Tamil', 'Malayalam', 'Marathi', 'Gujarati'
+];
+
 const COACH_TYPES = [
   'Yoga Coach', 'Fitness Coach', 'Badminton Coach', 'Football Coach',
   'Gymnastics Coach', 'Cricket Coach', 'Tennis Instructor', 'Basketball Coach',
@@ -184,13 +218,21 @@ function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     'Active': 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-    'On Leave': 'bg-amber-500/10 border-amber-500/20 text-amber-400',
     'Inactive': 'bg-red-500/10 border-red-500/20 text-red-400',
-    'Terminated': 'bg-slate-500/10 border-slate-500/20 text-slate-400',
+    'Onboarding': 'bg-slate-500/10 border-slate-500/20 text-slate-400',
+    'Document Upload Pending': 'bg-rose-500/10 border-rose-500/20 text-rose-400',
+    'Pending Verification': 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+  };
+  const dotColor: Record<string, string> = {
+    'Active': 'bg-emerald-400',
+    'Inactive': 'bg-red-400',
+    'Onboarding': 'bg-slate-400',
+    'Document Upload Pending': 'bg-rose-400',
+    'Pending Verification': 'bg-amber-400',
   };
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${map[status] ?? 'bg-slate-500/10 border-slate-500/20 text-slate-400'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${status === 'Active' ? 'bg-emerald-400' : status === 'On Leave' ? 'bg-amber-400' : 'bg-red-400'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor[status] ?? 'bg-slate-400'}`} />
       {status}
     </span>
   );
@@ -272,19 +314,21 @@ export default function CoachesPage() {
     email: '',
     password: '',
     phone: '',
-    primary_skill: COACH_TYPES[0],
-    experience_years: 2,
-    service_types: ['Offline'] as string[],
-    class_types: ['Group Classes'] as string[],
-    languages_known: 'English',
-    qualification: '',
+    primary_skill: 'Badminton Coach',
+    specialization: 'Singles',
+    experience_years: 6,
+    service_types: ['Personal Training', 'Group Training', 'Online Coaching'] as string[],
+    class_types: ['Regular Classes', 'Crash Course', 'Tournament Coaching'] as string[],
+    languages_known: ['English', 'Hindi', 'Kannada'] as string[],
+    qualification: 'B.P.Ed, NIS Certified',
     certifications_summary: '',
     joining_date: new Date().toISOString().split('T')[0],
-    bio: '',
+    bio: 'Passionate badminton coach with 6+ years of experience in training players of all levels. Focused on skill development, fitness and mindset building to help players achieve their best.',
     country: 'India',
-    state: '',
-    city: '',
-    area: '',
+    state: 'Karnataka',
+    city: 'Bangalore',
+    area: 'Indiranagar',
+    address: '123, 5th Main, Indiranagar, Bangalore, Karnataka - 560038',
     salary_type: 'Fixed Monthly',
     fixed_salary: 30000,
     per_class_rate: 500,
@@ -297,6 +341,127 @@ export default function CoachesPage() {
   });
   const [onboardPhoto, setOnboardPhoto] = useState<File | null>(null);
   const [onboardPhotoPreview, setOnboardPhotoPreview] = useState<string | null>(null);
+  const [onboardStep, setOnboardStep] = useState(1);
+  const [onboardShowPassword, setOnboardShowPassword] = useState(false);
+  const [onboardLangInput, setOnboardLangInput] = useState('');
+
+  // Test Mode Feature Flag
+  const [isTestMode, setIsTestMode] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('testmode')) {
+        setIsTestMode(true);
+      }
+    }
+  }, []);
+
+  const fillRandomAdminCoachData = () => {
+    const randomId = Math.floor(1000 + Math.random() * 9000);
+    const firstNames = ['Amit', 'Raj', 'Vikram', 'Sanjay', 'Rahul', 'Pooja', 'Anjali', 'Neha', 'Sunita', 'Karan'];
+    const lastNames = ['Sharma', 'Verma', 'Kumar', 'Singh', 'Patel', 'Joshi', 'Mehta', 'Nair', 'Das', 'Gupta'];
+    const skills = ['Badminton Coach', 'Football Coach', 'Gymnastics Coach', 'Cricket Coach', 'Tennis Instructor', 'Basketball Coach'];
+    const specializations = ['Singles', 'Doubles', 'Mixed Doubles', 'Coaching', 'Physical Training', 'Tactics'];
+    const serviceTypesOptions = ['Personal Training', 'Group Training', 'Online Coaching', 'Offline Coaching'];
+    const classTypesOptions = ['Regular Classes', 'Crash Course', 'Tournament Coaching', 'Summer Camp'];
+    const languagesList = ['English', 'Hindi', 'Kannada', 'Telugu', 'Tamil', 'Marathi'];
+    const cities = ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Pune', 'Chennai'];
+    const states = ['Karnataka', 'Maharashtra', 'Delhi', 'Telangana', 'Maharashtra', 'Tamil Nadu'];
+    const areas = ['Indiranagar', 'Koramangala', 'Bandra', 'Connaught Place', 'Gachibowli', 'Jayanagar'];
+    
+    const randFirst = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const randLast = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const randEmail = `admin.coach.${randFirst.toLowerCase()}.${randLast.toLowerCase()}.${randomId}@upasthiti.com`;
+    const randPhone = '9' + Array.from({ length: 9 }, () => Math.floor(Math.random() * 10)).join('');
+    const randPassword = `AdminCoach@Pass${randomId}!`;
+    
+    const randSkill = skills[Math.floor(Math.random() * skills.length)];
+    const randSpecialization = specializations[Math.floor(Math.random() * specializations.length)];
+    const randExp = Math.floor(2 + Math.random() * 15);
+    const randQual = `B.P.Ed, Certified ${randSkill} Coach`;
+    
+    const randLangs = [...new Set(Array.from({ length: 2 + Math.floor(Math.random() * 2) }, () => languagesList[Math.floor(Math.random() * languagesList.length)]))];
+    const randServices = [...new Set(Array.from({ length: 1 + Math.floor(Math.random() * 2) }, () => serviceTypesOptions[Math.floor(Math.random() * serviceTypesOptions.length)]))];
+    const randClasses = [...new Set(Array.from({ length: 1 + Math.floor(Math.random() * 2) }, () => classTypesOptions[Math.floor(Math.random() * classTypesOptions.length)]))];
+    
+    const randBio = `Experienced ${randSkill} trainer specializing in ${randSpecialization.toLowerCase()}. Dedicated to high performance training and mentoring players for over ${randExp} years.`;
+    
+    const cityIdx = Math.floor(Math.random() * cities.length);
+    const randCity = cities[cityIdx];
+    const randState = states[cityIdx];
+    const randArea = areas[Math.floor(Math.random() * areas.length)];
+    const randAddress = `Plot No. ${Math.floor(10 + Math.random() * 90)}, ${randArea}, ${randCity}, ${randState} - ${Math.floor(560001 + Math.random() * 99)}`;
+
+    const randBankName = ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank'][Math.floor(Math.random() * 4)];
+    const randAccountNum = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+    const randIfsc = 'SBIN000' + Math.floor(1000 + Math.random() * 9000).toString();
+    const randUpi = `${randFirst.toLowerCase()}${randomId}@upi`;
+    const randPan = 'ABCDE' + Math.floor(1000 + Math.random() * 9000) + 'F';
+
+    setOnboardForm({
+      first_name: randFirst,
+      last_name: randLast,
+      email: randEmail,
+      password: randPassword,
+      phone: randPhone,
+      primary_skill: randSkill,
+      specialization: randSpecialization,
+      experience_years: randExp,
+      service_types: randServices,
+      class_types: randClasses,
+      languages_known: randLangs,
+      qualification: randQual,
+      certifications_summary: 'National Level Certificate, NIS Diploma',
+      joining_date: new Date().toISOString().split('T')[0],
+      bio: randBio,
+      country: 'India',
+      state: randState,
+      city: randCity,
+      area: randArea,
+      address: randAddress,
+      salary_type: ['Fixed Monthly', 'Per Class', 'Revenue Share', 'Hybrid'][Math.floor(Math.random() * 4)],
+      fixed_salary: Math.floor(15 + Math.random() * 40) * 1000,
+      per_class_rate: Math.floor(4 + Math.random() * 8) * 100,
+      revenue_share_pct: Math.floor(5 + Math.random() * 15),
+      bank_name: randBankName,
+      bank_account_number: randAccountNum,
+      bank_ifsc_code: randIfsc,
+      upi_id: randUpi,
+      pan_number: randPan
+    });
+
+    const dummyFile = new File([""], "avatar.jpg", { type: "image/jpeg" });
+    setOnboardPhoto(dummyFile);
+    setOnboardPhotoPreview(`https://api.dicebear.com/7.x/adventurer/svg?seed=${randFirst}${randomId}`);
+  };
+
+  // Wizard password and step validators
+  const onboardFormPassword = onboardForm.password || '';
+  const onboardHasLength = onboardFormPassword.length >= 8;
+  const onboardHasUppercase = /[A-Z]/.test(onboardFormPassword);
+  const onboardHasNumber = /\d/.test(onboardFormPassword);
+  const onboardHasSpecial = /[^A-Za-z0-9]/.test(onboardFormPassword);
+  const isOnboardPasswordValid = onboardHasLength && onboardHasUppercase && onboardHasNumber && onboardHasSpecial;
+
+  const isModalStep1Valid = onboardForm.first_name.trim() !== '' && onboardForm.last_name.trim() !== '' && onboardForm.email.trim() !== '' && onboardForm.phone.length === 10 && isOnboardPasswordValid;
+  const isModalStep2Valid = onboardForm.primary_skill.trim() !== '' && onboardForm.specialization.trim() !== '' && String(onboardForm.experience_years).trim() !== '' && onboardForm.qualification.trim() !== '' && onboardForm.service_types.length > 0 && onboardForm.class_types.length > 0 && onboardForm.bio.trim() !== '' && onboardForm.bio.length <= 500;
+  const isModalStep3Valid = onboardForm.country.trim() !== '' && onboardForm.state.trim() !== '' && onboardForm.city.trim() !== '' && onboardForm.area.trim() !== '';
+
+  const addLanguageOnboard = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = onboardLangInput.trim();
+      if (val && !onboardForm.languages_known.includes(val)) {
+        setOnboardForm(f => ({ ...f, languages_known: [...f.languages_known, val] }));
+        setOnboardLangInput('');
+      }
+    }
+  };
+
+  const removeLanguageOnboard = (lang: string) => {
+    setOnboardForm(f => ({ ...f, languages_known: f.languages_known.filter(l => l !== lang) }));
+  };
+
 
   const loadCoaches = useCallback(async () => {
     setLoading(true);
@@ -476,7 +641,7 @@ export default function CoachesPage() {
         experienceYears: Number(onboardForm.experience_years),
         serviceTypes: onboardForm.service_types,
         classTypes: onboardForm.class_types,
-        languagesKnown: onboardForm.languages_known.split(',').map(s => s.trim()),
+        languagesKnown: onboardForm.languages_known,
         qualification: onboardForm.qualification || null,
         certificationsSummary: onboardForm.certifications_summary || null,
         joiningDate: onboardForm.joining_date,
@@ -485,6 +650,8 @@ export default function CoachesPage() {
         state: onboardForm.state || null,
         city: onboardForm.city || null,
         area: onboardForm.area || null,
+        address: onboardForm.address || null,
+        specialization: onboardForm.specialization || null,
         salaryType: onboardForm.salary_type,
         fixedSalary: Number(onboardForm.fixed_salary),
         perClassRate: Number(onboardForm.per_class_rate),
@@ -604,8 +771,8 @@ export default function CoachesPage() {
     );
   });
 
-  const activeCount = coaches.filter((c) => c.coach_profile?.employment_status === 'Active').length;
-  const inactiveCount = coaches.filter((c) => c.coach_profile?.employment_status === 'Inactive').length;
+  const activeCount = coaches.filter((c) => c.coach_profile?.account_status === 'Active').length;
+  const inactiveCount = coaches.filter((c) => c.coach_profile?.account_status !== 'Active').length;
 
   return (
     <div className="min-h-screen bg-[#060814] text-slate-100 p-6 lg:p-8 space-y-8 animate-in fade-in duration-300">
@@ -631,7 +798,12 @@ export default function CoachesPage() {
             Generate Invite URL
           </button>
           <button
-            onClick={() => setShowOnboard(true)}
+            onClick={() => {
+              setOnboardStep(1);
+              setOnboardPhoto(null);
+              setOnboardPhotoPreview(null);
+              setShowOnboard(true);
+            }}
             className="btn-premium flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
           >
             <Plus className="w-4 h-4" />
@@ -744,11 +916,11 @@ export default function CoachesPage() {
                           {coach.coach_profile?.joining_date ? new Date(coach.coach_profile.joining_date).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3.5">
-                          <StatusBadge status={coach.coach_profile?.employment_status ?? 'Inactive'} />
+                          <StatusBadge status={coach.coach_profile?.account_status ?? 'Inactive'} />
                         </td>
                         <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2">
-                            {coach.coach_profile?.employment_status === 'Inactive' ? (
+                            {coach.coach_profile?.account_status !== 'Active' ? (
                               <button
                                 onClick={() => handleToggleActive(coach, 'approve')}
                                 className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold flex items-center gap-1"
@@ -1183,121 +1355,767 @@ export default function CoachesPage() {
 
       {/* ── Onboard Modal ── */}
       {showOnboard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="relative glass-panel rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto animate-in fade-in duration-300">
-            <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-[#060814]/90 backdrop-blur-md z-10">
-              <div className="flex items-center gap-3">
-                <UserCheck className="w-5 h-5 text-indigo-400" />
-                <div>
-                  <h2 className="text-slate-100 font-semibold text-base">Onboard New Team Instructor</h2>
-                  <p className="text-slate-400 text-xs">Onboard profile into multi-tenant database registry.</p>
-                </div>
-              </div>
-              <button onClick={() => setShowOnboard(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-200"><X className="w-4 h-4" /></button>
-            </div>
-
-            <form onSubmit={handleOnboardSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">First Name *</label>
-                  <input required type="text" placeholder="Rahul" value={onboardForm.first_name} onChange={(e) => setOnboardForm(f => ({ ...f, first_name: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Last Name *</label>
-                  <input required type="text" placeholder="Sharma" value={onboardForm.last_name} onChange={(e) => setOnboardForm(f => ({ ...f, last_name: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email Address *</label>
-                  <input required type="email" placeholder="rahul@academy.com" value={onboardForm.email} onChange={(e) => setOnboardForm(f => ({ ...f, email: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Password *</label>
-                  <input required type="password" placeholder="••••••••" value={onboardForm.password} onChange={(e) => setOnboardForm(f => ({ ...f, password: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Mobile Number</label>
-                  <input type="tel" placeholder="+91 98765 43210" value={onboardForm.phone} onChange={(e) => setOnboardForm(f => ({ ...f, phone: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Primary Skill Speciality *</label>
-                  <select value={onboardForm.primary_skill} onChange={(e) => setOnboardForm(f => ({ ...f, primary_skill: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full bg-[#060814]">
-                    {COACH_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Experience (Years) *</label>
-                  <input required type="number" value={onboardForm.experience_years} onChange={(e) => setOnboardForm(f => ({ ...f, experience_years: Number(e.target.value) }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Salary / Payroll Type</label>
-                  <select value={onboardForm.salary_type} onChange={(e) => setOnboardForm(f => ({ ...f, salary_type: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full bg-[#060814]">
-                    <option value="Fixed Monthly">Fixed Monthly</option>
-                    <option value="Per Class">Per Class Session</option>
-                    <option value="Revenue Share">Revenue Share %</option>
-                    <option value="Hybrid">Hybrid Combo Matrix</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Fixed Base Salary (₹)</label>
-                  <input type="number" value={onboardForm.fixed_salary} onChange={(e) => setOnboardForm(f => ({ ...f, fixed_salary: Number(e.target.value) }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Per Session Rate (₹)</label>
-                  <input type="number" value={onboardForm.per_class_rate} onChange={(e) => setOnboardForm(f => ({ ...f, per_class_rate: Number(e.target.value) }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Revenue Share Pct (%)</label>
-                  <input type="number" value={onboardForm.revenue_share_pct} onChange={(e) => setOnboardForm(f => ({ ...f, revenue_share_pct: Number(e.target.value) }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Joined Date</label>
-                  <input type="date" value={onboardForm.joining_date} onChange={(e) => setOnboardForm(f => ({ ...f, joining_date: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                </div>
-              </div>
-
-              {/* Bank Details section */}
-              <div className="space-y-3.5 pt-2 border-t border-white/10">
-                <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Landmark className="w-3.5 h-3.5" /> Bank & Ledger details
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Bank Name</label>
-                    <input type="text" placeholder="HDFC Bank" value={onboardForm.bank_name} onChange={(e) => setOnboardForm(f => ({ ...f, bank_name: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Account Number</label>
-                    <input type="text" placeholder="50100293849182" value={onboardForm.bank_account_number} onChange={(e) => setOnboardForm(f => ({ ...f, bank_account_number: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">IFSC Code</label>
-                    <input type="text" placeholder="HDFC0000123" value={onboardForm.bank_ifsc_code} onChange={(e) => setOnboardForm(f => ({ ...f, bank_ifsc_code: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">UPI ID</label>
-                    <input type="text" placeholder="rahul@okaxis" value={onboardForm.upi_id} onChange={(e) => setOnboardForm(f => ({ ...f, upi_id: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">PAN Number</label>
-                    <input type="text" placeholder="ABCDE1234F" value={onboardForm.pan_number} onChange={(e) => setOnboardForm(f => ({ ...f, pan_number: e.target.value }))} className="glass-input rounded-xl px-3 py-2 text-xs w-full" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bio block */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="relative glass-panel rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden animate-in fade-in duration-300 border border-white/10 bg-[#060814]/95">
+            
+            {/* Modal Left Sidebar */}
+            <div className="w-full md:w-[260px] bg-white/[0.02] border-b md:border-b-0 md:border-r border-white/10 p-6 flex flex-col justify-between shrink-0">
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">Instructor Biography</label>
-                <textarea rows={3} value={onboardForm.bio} onChange={(e) => setOnboardForm(f => ({ ...f, bio: e.target.value }))} placeholder="Onboard details, achievements, cert records..." className="glass-input rounded-xl px-3 py-2 text-xs w-full resize-none" />
+                <div className="flex items-center gap-2 mb-6">
+                  <UserCheck className="w-5 h-5 text-indigo-400" />
+                  <h3 className="text-slate-100 font-bold text-sm">Onboard Instructor</h3>
+                </div>
+
+                {/* Steps checklist */}
+                <div className="space-y-3">
+                  {ONBOARD_STEPS.map((s) => {
+                    const isActive = onboardStep === s.id;
+                    const isCompleted = onboardStep > s.id;
+                    return (
+                      <div
+                        key={s.id}
+                        className={`flex items-start gap-3 p-2 rounded-xl transition-all duration-200 ${
+                          isActive 
+                            ? 'bg-indigo-500/10 border border-indigo-500/20' 
+                            : 'border border-transparent'
+                        }`}
+                      >
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold transition-all ${
+                          isCompleted 
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                            : isActive 
+                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
+                            : 'bg-white/5 text-slate-500 border border-white/5'
+                        }`}>
+                          {isCompleted ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : s.id}
+                        </div>
+                        <div>
+                          <h4 className={`text-xs font-semibold leading-tight ${
+                            isActive ? 'text-indigo-300 font-bold' : isCompleted ? 'text-slate-300' : 'text-slate-500'
+                          }`}>
+                            {s.name}
+                          </h4>
+                          <p className={`text-[9px] mt-0.5 ${
+                            isActive ? 'text-indigo-400' : 'text-slate-600'
+                          }`}>
+                            {s.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Submit */}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowOnboard(false)} className="btn-secondary flex-1 rounded-xl py-2.5 text-xs font-semibold">Cancel</button>
-                <button type="submit" disabled={formLoading} className="btn-premium flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5">
-                  {formLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />} Onboard Coach Profile
+              <div className="mt-6 space-y-4">
+                <div className="bg-indigo-950/20 border border-indigo-500/10 p-3 rounded-xl flex items-start gap-2.5">
+                  <ShieldAlert className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                  <p className="text-[10px] leading-relaxed text-indigo-300">
+                    Administrator onboarding creates the credentials and extends the profile database.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowOnboard(false)}
+                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/5 transition-all text-center"
+                >
+                  Cancel Onboarding
                 </button>
               </div>
-            </form>
+            </div>
+
+            {/* Modal Right Form Container */}
+            <div className="flex-1 flex flex-col min-w-0 h-[80vh] md:h-auto overflow-y-auto">
+              
+              {/* Stepper horizontal progress dots */}
+              <div className="px-6 pt-6 pb-2 border-b border-white/5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-slate-200 text-sm font-semibold">Step {onboardStep} of 5</h3>
+                    <p className="text-slate-400 text-xs mt-0.5">{ONBOARD_STEPS[onboardStep - 1].name}</p>
+                  </div>
+                  <button onClick={() => setShowOnboard(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200"><X className="w-4 h-4" /></button>
+                </div>
+              </div>
+
+              {/* Form Areas */}
+              <form onSubmit={handleOnboardSubmit} className="p-6 flex-1 flex flex-col justify-between space-y-6">
+                {isTestMode && (
+                  <div className="p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-2xl flex items-center justify-between animate-in fade-in duration-300">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                      <span className="text-xs text-indigo-300 font-bold tracking-wide uppercase text-[10px]">Test Mode Active</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={fillRandomAdminCoachData}
+                      className="px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer border border-transparent"
+                    >
+                      <span>⚡ Auto-fill Test Data</span>
+                    </button>
+                  </div>
+                )}
+                
+                {/* ----------------- STEP 1 ----------------- */}
+                {onboardStep === 1 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-200">Personal Information</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Let's enter basic identity details for the new instructor.</p>
+                    </div>
+
+                    {/* Profile photo picker */}
+                    <div className="space-y-2">
+                      <label className="block text-xs text-slate-400 font-medium">Instructor Profile Avatar</label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                          {onboardPhotoPreview ? (
+                            <img src={onboardPhotoPreview} className="w-full h-full object-cover" alt="Avatar preview" />
+                          ) : (
+                            <User className="w-8 h-8 text-slate-500" />
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <label className="inline-flex items-center px-3 py-1.5 border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold cursor-pointer transition-colors shadow-sm">
+                            <Camera className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                            Select Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleOnboardPhotoChange}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-[10px] text-slate-500">JPG, PNG up to 2MB</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Names grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">First Name *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Rahul"
+                          value={onboardForm.first_name}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, first_name: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Last Name *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Sharma"
+                          value={onboardForm.last_name}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, last_name: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Contact details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email Address *</label>
+                        <input
+                          required
+                          type="email"
+                          placeholder="rahul@academy.com"
+                          value={onboardForm.email}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, email: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Mobile Number *</label>
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 flex items-center gap-1 text-slate-500 text-xs">
+                            <span>🇮🇳</span>
+                            <span className="font-semibold">+91</span>
+                          </span>
+                          <input
+                            required
+                            type="tel"
+                            maxLength={10}
+                            placeholder="98765 43210"
+                            value={onboardForm.phone}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '') }))}
+                            className="glass-input rounded-xl pl-14 pr-3 py-2 text-xs w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Password */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5 font-medium">Password *</label>
+                      <div className="relative">
+                        <input
+                          required
+                          type={onboardShowPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={onboardForm.password}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, password: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setOnboardShowPassword(!onboardShowPassword)}
+                          className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300"
+                        >
+                          {onboardShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      {/* Password Criteria Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            onboardHasLength ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={onboardHasLength ? 'text-emerald-400' : ''}>At least 8 characters</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            onboardHasUppercase ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={onboardHasUppercase ? 'text-emerald-400' : ''}>One uppercase letter</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            onboardHasNumber ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={onboardHasNumber ? 'text-emerald-400' : ''}>One number</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            onboardHasSpecial ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={onboardHasSpecial ? 'text-emerald-400' : ''}>One special character</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ----------------- STEP 2 ----------------- */}
+                {onboardStep === 2 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-200">Professional Profile</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Define coaching expertise, availability structure, and base payroll values.</p>
+                    </div>
+
+                    {/* Skill & Specialization */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Primary Skill *</label>
+                        <select
+                          value={onboardForm.primary_skill}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, primary_skill: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full bg-[#060814]"
+                        >
+                          {COACH_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Specialization *</label>
+                        <select
+                          value={onboardForm.specialization}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, specialization: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full bg-[#060814]"
+                        >
+                          {SPECIALIZATIONS_ONBOARD.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Exp & Qualification */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Experience (in years) *</label>
+                        <input
+                          required
+                          type="number"
+                          min={0}
+                          value={onboardForm.experience_years}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, experience_years: Number(e.target.value) }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Qualification *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="e.g. B.P.Ed, NIS Certified"
+                          value={onboardForm.qualification}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, qualification: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Languages tag list */}
+                    <div className="space-y-1">
+                      <label className="block text-xs text-slate-400 font-medium">Languages Known</label>
+                      <div className="flex flex-wrap gap-1.5 p-2 border border-white/10 rounded-xl bg-white/[0.02] min-h-[44px] items-center">
+                        {onboardForm.languages_known.map(lang => (
+                          <span key={lang} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-semibold">
+                            {lang}
+                            <button type="button" onClick={() => removeLanguageOnboard(lang)} className="text-indigo-400 hover:text-indigo-300">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          type="text"
+                          value={onboardLangInput}
+                          onChange={(e) => setOnboardLangInput(e.target.value)}
+                          onKeyDown={addLanguageOnboard}
+                          placeholder="Add language + Enter"
+                          className="flex-1 min-w-[120px] bg-transparent outline-none border-none text-xs text-slate-200 px-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Service & Class Types */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Service Types</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {SERVICE_TYPES_ONBOARD.map(svc => {
+                            const isSelected = onboardForm.service_types.includes(svc);
+                            return (
+                              <button
+                                key={svc}
+                                type="button"
+                                onClick={() => {
+                                  setOnboardForm(f => {
+                                    const next = isSelected 
+                                      ? f.service_types.filter(s => s !== svc)
+                                      : [...f.service_types, svc];
+                                    return { ...f, service_types: next };
+                                  });
+                                }}
+                                className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold flex items-center gap-1 transition-all ${
+                                  isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                                }`}
+                              >
+                                {svc}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Class Types</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {CLASS_TYPES_ONBOARD.map(cls => {
+                            const isSelected = onboardForm.class_types.includes(cls);
+                            return (
+                              <button
+                                key={cls}
+                                type="button"
+                                onClick={() => {
+                                  setOnboardForm(f => {
+                                    const next = isSelected 
+                                      ? f.class_types.filter(c => c !== cls)
+                                      : [...f.class_types, cls];
+                                    return { ...f, class_types: next };
+                                  });
+                                }}
+                                className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold flex items-center gap-1 transition-all ${
+                                  isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                                }`}
+                              >
+                                {cls}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payroll Settings - Admin Only */}
+                    <div className="p-4 border border-white/5 bg-white/[0.01] rounded-2xl space-y-3">
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                        <IndianRupee className="w-3 h-3" /> Salary & Payroll (Admin Configure)
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="col-span-2">
+                          <label className="block text-[9px] text-slate-500 mb-1">Payroll Type</label>
+                          <select
+                            value={onboardForm.salary_type}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, salary_type: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full bg-[#060814]"
+                          >
+                            <option value="Fixed Monthly">Fixed Monthly</option>
+                            <option value="Per Class">Per Class Session</option>
+                            <option value="Revenue Share">Revenue Share %</option>
+                            <option value="Hybrid">Hybrid Combo Matrix</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">Monthly Base (₹)</label>
+                          <input
+                            type="number"
+                            value={onboardForm.fixed_salary}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, fixed_salary: Number(e.target.value) }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">Per Session (₹)</label>
+                          <input
+                            type="number"
+                            value={onboardForm.per_class_rate}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, per_class_rate: Number(e.target.value) }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bio */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1 font-medium">Instructor Biography</label>
+                      <textarea
+                        rows={2}
+                        maxLength={500}
+                        value={onboardForm.bio}
+                        onChange={(e) => setOnboardForm(f => ({ ...f, bio: e.target.value }))}
+                        className="glass-input rounded-xl px-3 py-1.5 text-xs w-full resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* ----------------- STEP 3 ----------------- */}
+                {onboardStep === 3 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-200">Location & Ledger Details</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Provide location parameters and banking ledger configs.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Country *</label>
+                        <select
+                          value={onboardForm.country}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, country: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full bg-[#060814]"
+                        >
+                          <option value="India">India</option>
+                          <option value="USA">United States</option>
+                          <option value="UK">United Kingdom</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">State *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Karnataka"
+                          value={onboardForm.state}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, state: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">City *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Bangalore"
+                          value={onboardForm.city}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, city: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Area / Locality *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Indiranagar"
+                          value={onboardForm.area}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, area: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5 font-medium">Joined Date</label>
+                        <input
+                          type="date"
+                          value={onboardForm.joining_date}
+                          onChange={(e) => setOnboardForm(f => ({ ...f, joining_date: e.target.value }))}
+                          className="glass-input rounded-xl px-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Full Address */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5 font-medium">Full Physical Address</label>
+                      <textarea
+                        rows={2}
+                        maxLength={200}
+                        value={onboardForm.address}
+                        onChange={(e) => setOnboardForm(f => ({ ...f, address: e.target.value }))}
+                        className="glass-input rounded-xl px-3 py-2 text-xs w-full resize-none"
+                      />
+                    </div>
+
+                    {/* Bank Ledger details - Admin Only */}
+                    <div className="p-4 border border-white/5 bg-white/[0.01] rounded-2xl space-y-3">
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                        <Landmark className="w-3 h-3" /> Bank Account & PAN Ledger (Admin Configure)
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">Bank Name</label>
+                          <input
+                            type="text"
+                            placeholder="HDFC Bank"
+                            value={onboardForm.bank_name}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, bank_name: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">Account Number</label>
+                          <input
+                            type="text"
+                            placeholder="5010..."
+                            value={onboardForm.bank_account_number}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, bank_account_number: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">IFSC Code</label>
+                          <input
+                            type="text"
+                            placeholder="HDFC..."
+                            value={onboardForm.bank_ifsc_code}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, bank_ifsc_code: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">UPI ID</label>
+                          <input
+                            type="text"
+                            placeholder="rahul@okaxis"
+                            value={onboardForm.upi_id}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, upi_id: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 mb-1">PAN Number</label>
+                          <input
+                            type="text"
+                            placeholder="ABCDE..."
+                            value={onboardForm.pan_number}
+                            onChange={(e) => setOnboardForm(f => ({ ...f, pan_number: e.target.value }))}
+                            className="glass-input rounded-xl px-2 py-1 text-xs w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ----------------- STEP 4 ----------------- */}
+                {onboardStep === 4 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-200">Account Security & Verification</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Verification status is configured to mock-verified for onboarding setup.</p>
+                    </div>
+
+                    <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-slate-400" />
+                          <h4 className="text-xs font-bold text-slate-300">Phone Verification</h4>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                          <Check className="w-3 h-3 stroke-[3]" /> Verified
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Phone verification is bypassed. Checked mobile number: +91 {onboardForm.phone || '98765 43210'}
+                      </p>
+                    </div>
+
+                    <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-slate-400" />
+                          <h4 className="text-xs font-bold text-slate-300">Email Verification</h4>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                          <Check className="w-3 h-3 stroke-[3]" /> Verified
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Verification email is bypassed. Marked destination address: {onboardForm.email || 'rahul@academy.com'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ----------------- STEP 5 ----------------- */}
+                {onboardStep === 5 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-200">Review Onboard Information</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Please check everything before locking this coach profile into the database.</p>
+                    </div>
+
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      
+                      {/* Personal Card */}
+                      <div className="border border-white/5 bg-white/[0.01] p-4 rounded-xl relative">
+                        <button type="button" onClick={() => setOnboardStep(1)} className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-300 text-xs font-bold">Edit</button>
+                        <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Personal Info</h4>
+                        <div className="grid grid-cols-2 gap-y-2 text-xs">
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Name</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.first_name} {onboardForm.last_name}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Email</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Phone</span>
+                            <span className="text-slate-200 font-normal">+91 {onboardForm.phone}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Professional Card */}
+                      <div className="border border-white/5 bg-white/[0.01] p-4 rounded-xl relative">
+                        <button type="button" onClick={() => setOnboardStep(2)} className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-300 text-xs font-bold">Edit</button>
+                        <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Professional details</h4>
+                        <div className="grid grid-cols-2 gap-y-2.5 text-xs">
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Skill / Specialization</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.primary_skill} / {onboardForm.specialization}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Experience / Qualification</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.experience_years} Years / {onboardForm.qualification}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Payroll structure</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.salary_type} (Base: ₹{onboardForm.fixed_salary})</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-slate-500 block text-[10px]">Languages</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.languages_known.join(', ')}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-slate-500 block text-[10px]">Bio</span>
+                            <span className="text-slate-200 font-normal block max-w-xl whitespace-pre-wrap leading-relaxed">{onboardForm.bio}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Location Card */}
+                      <div className="border border-white/5 bg-white/[0.01] p-4 rounded-xl relative">
+                        <button type="button" onClick={() => setOnboardStep(3)} className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-300 text-xs font-bold">Edit</button>
+                        <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Location & Ledger</h4>
+                        <div className="grid grid-cols-2 gap-y-2 text-xs">
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Area / City</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.area}, {onboardForm.city}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Bank / Account</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.bank_name || '—'} / {onboardForm.bank_account_number || '—'}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-slate-500 block text-[10px]">Address</span>
+                            <span className="text-slate-200 font-normal">{onboardForm.address}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer Buttons navigation bar */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-4 mt-4 shrink-0">
+                  {onboardStep > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setOnboardStep(onboardStep - 1)}
+                      className="inline-flex items-center px-4 py-2 border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-all"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+
+                  {onboardStep < 5 ? (
+                    <button
+                      type="button"
+                      onClick={() => setOnboardStep(onboardStep + 1)}
+                      disabled={
+                        (onboardStep === 1 && !isModalStep1Valid) ||
+                        (onboardStep === 2 && !isModalStep2Valid) ||
+                        (onboardStep === 3 && !isModalStep3Valid)
+                      }
+                      className="inline-flex items-center px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Continue <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={formLoading}
+                      className="inline-flex items-center px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {formLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5 mr-1 font-bold" />
+                      )}
+                      Onboard Coach Profile
+                    </button>
+                  )}
+                </div>
+
+              </form>
+            </div>
+
           </div>
         </div>
       )}

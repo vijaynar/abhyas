@@ -1,0 +1,17 @@
+# Upasthiti Project Rules & Guidelines
+
+Whenever making code changes in this project, adhere to the following checklist and rules:
+
+## Verification & QA Checklists
+- **Layouts**: Verify both mobile and desktop layouts after every code change.
+- **Themes**: Verify both dark and light themes (ensure text contrast, border alignment, and background harmony).
+- **Roles**: Verify role-based visibility across all key roles:
+  - Super Admin
+  - Admin
+  - Coach
+  - Student
+- **UI States**: Verify loading, empty, and error states for all components and pages.
+- **Regressions**: Proactively report any UI or functional regressions before completing a task.
+
+## Styling Rules
+- **Color Tokens**: Always use theme-defined design tokens and CSS variables (defined in `globals.css`). Never use hardcoded color hexes, inline colors, or non-standard Tailwind classes (e.g. `text-slate-450` or similar non-existent weights).

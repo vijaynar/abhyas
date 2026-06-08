@@ -9,14 +9,155 @@ import { adminDb, ok, err, created } from '@/lib/api';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, firstName, lastName, phone, tenantName, tenantSlug, country, state, city, address } = body;
+    const {
+      email, password, firstName, lastName, phone, role, tenantId, avatarUrl,
+      // Coach fields
+      primarySkill, experienceYears, serviceTypes, classTypes, languagesKnown,
+      qualification, certificationsSummary, joiningDate, bio,
+      country, state, city, area, address, specialization,
+      gender, dateOfBirth,
+      // Financials
+      bankAccountNumber, bankIfscCode, bankName, upiId, panNumber,
+      // Academy fields
+      tenantName, tenantSlug
+    } = body;
 
-    // Simple validation
+    const db = adminDb();
+
+    if (role === 'coach') {
+      // ── Coach registration ─────────────────────────────────
+      if (!email || !password || !firstName || !lastName || !tenantId || !primarySkill || experienceYears === undefined || !joiningDate) {
+        return err('Missing required coach onboarding fields.', 422);
+      }
+
+      // Fetch the global Coach role ID
+      const { data: coachRole } = await db
+        .from('roles')
+        .select('id')
+        .eq('name', 'Coach')
+        .is('tenant_id', null)
+        .maybeSingle();
+
+      // Create Supabase Auth user
+      const { data: authData, error: authError } = await db.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm for onboarding
+        app_metadata: {
+          tenant_id: tenantId,
+          role: 'coach',
+        },
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+        },
+      });
+
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          return err('A user with this email is already registered.', 409);
+        }
+        throw authError;
+      }
+
+      const userId = authData.user.id;
+
+      // Insert profile row in public.users (Inactive pending verification)
+      const { error: userErr } = await db.from('users').upsert({
+        id: userId,
+        tenant_id: tenantId,
+        email,
+        role: 'coach',
+        role_id: coachRole?.id || null,
+        available_roles: ['coach'],
+        first_name: firstName,
+        last_name: lastName,
+        phone: phone ?? null,
+        avatar_url: avatarUrl ?? null,
+        is_active: false, // Inactive by default until documents verified
+      });
+
+      if (userErr) {
+        await db.auth.admin.deleteUser(userId);
+        throw userErr;
+      }
+
+      // Generate a slug
+      const slug = `${firstName}-${lastName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
+
+      // Insert coaches extended profile
+      const { error: coachErr } = await db.from('coaches').insert({
+        id: userId,
+        tenant_id: tenantId,
+        primary_skill: primarySkill,
+        experience_years: Number(experienceYears),
+        service_types: serviceTypes || ['Offline'],
+        class_types: classTypes || ['Group Classes'],
+        languages_known: languagesKnown || ['English'],
+        qualification: qualification || null,
+        certifications_summary: certificationsSummary || null,
+        joining_date: joiningDate ? new Date(joiningDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        bio: bio || null,
+        country: country || 'India',
+        state: state || null,
+        city: city || null,
+        area: area || null,
+        address: address || null,
+        designation: primarySkill,
+        specialization: specialization || null,
+        gender: gender || null,
+        date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString().split('T')[0] : null,
+        account_status: 'Onboarding',
+        public_profile_slug: slug,
+        achievements: [],
+        gallery_urls: [],
+        avg_rating: 0.00,
+        retention_rate: 0.00,
+        conversion_rate: 0.00,
+        satisfaction_score: 0.00,
+      });
+
+      if (coachErr) {
+        await db.from('users').delete().eq('id', userId);
+        await db.auth.admin.deleteUser(userId);
+        throw coachErr;
+      }
+
+      // Insert financial settings for coach
+      const { error: finErr } = await db.from('coach_financial_settings').insert({
+        coach_id: userId,
+        tenant_id: tenantId,
+        salary_type: 'Fixed Monthly',
+        fixed_salary: 0.00,
+        per_class_rate: 0.00,
+        revenue_share_pct: 0.00,
+        bank_account_holder_name: `${firstName} ${lastName}`,
+        bank_account_number: bankAccountNumber || null,
+        bank_ifsc_code: bankIfscCode || null,
+        bank_name: bankName || null,
+        upi_id: upiId || null,
+        pan_number: panNumber || null,
+      });
+
+      if (finErr) {
+        await db.from('coaches').delete().eq('id', userId);
+        await db.from('users').delete().eq('id', userId);
+        await db.auth.admin.deleteUser(userId);
+        throw finErr;
+      }
+
+      return created({
+        userId,
+        email,
+        role: 'coach',
+        tenantId,
+      });
+    }
+
+    // ── Academy registration (original flow) ────────────────
     if (!email || !password || !firstName || !lastName || !tenantName || !tenantSlug) {
       return err('Missing required onboarding fields.', 422);
     }
-
-    const db = adminDb();
 
     // 1. Create the tenant first
     const { data: tenant, error: tenantError } = await db
@@ -96,6 +237,7 @@ export async function POST(req: Request) {
       profile,
     });
   } catch (e: unknown) {
+    console.error('REGISTRATION ERROR:', e);
     const message = e instanceof Error ? e.message : 'Internal server error';
     return err(message, 500);
   }

@@ -416,7 +416,7 @@ export default function StudentDashboard() {
       const { data: cData } = await supabase
         .from('coaches')
         .select('id, primary_skill, experience_years, service_types, class_types, languages_known, bio, public_profile_slug, avg_rating, users(first_name, last_name, avatar_url)')
-        .eq('employment_status', 'Active');
+        .eq('account_status', 'Active');
       setCoachesList(cData || []);
     } catch (err) {
       console.error('Failed to fetch coaches list:', err);
@@ -519,7 +519,7 @@ export default function StudentDashboard() {
           qualification: qualification || null,
           certifications_summary: certifications || null,
           bio: bio,
-          employment_status: 'Inactive', // Pending verification
+          account_status: 'Pending Verification',
           public_profile_slug: profileSlug,
           avg_rating: 0.00
         });
@@ -1289,7 +1289,7 @@ export default function StudentDashboard() {
           ) : coachProfile ? (
             <div className="glass-panel p-8 rounded-3xl border border-indigo-500/20 bg-indigo-500/[0.01] space-y-6 text-center max-w-xl mx-auto">
               
-              {coachProfile.employment_status === 'Inactive' ? (
+              {coachProfile.account_status !== 'Active' ? (
                 <>
                   <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto animate-pulse">
                     <RefreshCw className="w-7 h-7" />
@@ -1305,6 +1305,7 @@ export default function StudentDashboard() {
                   <div className="pt-4 border-t border-white/5 text-left space-y-3">
                     <h4 className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest">Submitted Application</h4>
                     <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5 text-xs">
+                      <p className="text-slate-300"><strong>Application Status:</strong> {coachProfile.account_status}</p>
                       <p className="text-slate-300"><strong>Skill Domain:</strong> {coachProfile.primary_skill}</p>
                       <p className="text-slate-300"><strong>Experience Profile:</strong> {coachProfile.experience_years} Years</p>
                       <p className="text-slate-300"><strong>Application Date:</strong> {new Date(coachProfile.created_at).toLocaleDateString()}</p>

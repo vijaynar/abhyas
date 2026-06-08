@@ -1073,7 +1073,7 @@ export default function AdminDashboard() {
           .from('coaches')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenantId)
-          .eq('employment_status', 'Pending');
+          .eq('account_status', 'Pending Verification');
 
         // Low attendance check (< 75% in 30 days)
         const range30Days = new Date();

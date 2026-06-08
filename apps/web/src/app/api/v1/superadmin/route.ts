@@ -205,7 +205,7 @@ export async function GET(req: Request) {
     const { count: pendingCoaches } = await db
       .from('coaches')
       .select('id', { count: 'exact', head: true })
-      .eq('employment_status', 'Pending');
+      .eq('account_status', 'Pending Verification');
 
     const loggedTenants = new Set((logs || []).filter(l => l.tenant_id).map(l => l.tenant_id));
     const noAttendanceCount = realTenants.filter((t: any) => !loggedTenants.has(t.id)).length;

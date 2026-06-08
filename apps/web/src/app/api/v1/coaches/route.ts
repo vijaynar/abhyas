@@ -31,7 +31,7 @@ export async function GET(req: Request) {
         coach_profile:coaches!inner(
           primary_skill, experience_years, service_types, class_types, languages_known,
           qualification, certifications_summary, joining_date, bio, country, state, city,
-          area, employment_status, public_profile_slug, achievements, gallery_urls,
+          area, account_status, public_profile_slug, achievements, gallery_urls,
           avg_rating, retention_rate, conversion_rate, satisfaction_score, created_at
         ),
         batch_assignments:coach_batch_assignments!coach_batch_assignments_coach_id_fkey(
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       email, password, firstName, lastName, phone, avatarUrl,
       primarySkill, experienceYears, serviceTypes, classTypes, languagesKnown,
       qualification, certificationsSummary, joiningDate, bio,
-      country, state, city, area,
+      country, state, city, area, address, specialization,
       salaryType, fixedSalary, perClassRate, revenueSharePct,
       bankAccountNumber, bankIfscCode, bankName, upiId, panNumber, tenantId
     } = body;
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     const userId = authData.user.id;
 
     // 2. Insert users profile row (Coaches require admin document verification before activation)
-    const { error: userErr } = await db.from('users').insert({
+    const { error: userErr } = await db.from('users').upsert({
       id: userId,
       tenant_id: effectiveTenantId,
       email,
@@ -148,7 +148,10 @@ export async function POST(req: Request) {
         state: state ?? null,
         city: city ?? null,
         area: area ?? null,
-        employment_status: 'Inactive', // Inactive by default
+        address: address ?? null,
+        designation: primarySkill,
+        specialization: specialization ?? null,
+        account_status: 'Onboarding',
         public_profile_slug: slug,
         achievements: [],
         gallery_urls: [],
@@ -234,7 +237,7 @@ export async function PUT(req: Request) {
 
       const { error: coachErr } = await db
         .from('coaches')
-        .update({ employment_status: 'Inactive' })
+        .update({ account_status: 'Inactive' })
         .eq('id', coachId);
       if (coachErr) throw coachErr;
 
@@ -290,7 +293,7 @@ export async function PUT(req: Request) {
 
       const { error: coachErr } = await db
         .from('coaches')
-        .update({ employment_status: 'Active' })
+        .update({ account_status: 'Active' })
         .eq('id', coachId);
       if (coachErr) throw coachErr;
 
@@ -299,14 +302,18 @@ export async function PUT(req: Request) {
 
     // Action: update coach profile fields
     const coachUpdate: Record<string, any> = {};
-    if (fields.primarySkill !== undefined) coachUpdate.primary_skill = fields.primarySkill;
+    if (fields.primarySkill !== undefined) {
+      coachUpdate.primary_skill = fields.primarySkill;
+    } else if (fields.expertise !== undefined) {
+      coachUpdate.primary_skill = fields.expertise;
+    }
     if (fields.experienceYears !== undefined) coachUpdate.experience_years = Number(fields.experienceYears);
     if (fields.serviceTypes !== undefined) coachUpdate.service_types = fields.serviceTypes;
     if (fields.classTypes !== undefined) coachUpdate.class_types = fields.classTypes;
     if (fields.languagesKnown !== undefined) coachUpdate.languages_known = fields.languagesKnown;
     if (fields.qualification !== undefined) coachUpdate.qualification = fields.qualification;
     if (fields.certificationsSummary !== undefined) coachUpdate.certifications_summary = fields.certificationsSummary;
-    if (fields.joiningDate !== undefined) coachUpdate.joining_date = fields.joiningDate;
+    if (fields.joiningDate !== undefined) coachUpdate.joining_date = fields.joiningDate || null;
     if (fields.bio !== undefined) coachUpdate.bio = fields.bio;
     if (fields.country !== undefined) coachUpdate.country = fields.country;
     if (fields.state !== undefined) coachUpdate.state = fields.state;
@@ -315,6 +322,21 @@ export async function PUT(req: Request) {
     if (fields.publicProfileSlug !== undefined) coachUpdate.public_profile_slug = fields.publicProfileSlug;
     if (fields.achievements !== undefined) coachUpdate.achievements = fields.achievements;
     if (fields.galleryUrls !== undefined) coachUpdate.gallery_urls = fields.galleryUrls;
+
+    // Redesigned profile new fields
+    if (fields.employeeId !== undefined) coachUpdate.employee_id = fields.employeeId;
+    if (fields.designation !== undefined) coachUpdate.designation = fields.designation;
+    if (fields.department !== undefined) coachUpdate.department = fields.department;
+    if (fields.specialization !== undefined) coachUpdate.specialization = fields.specialization;
+    if (fields.employeeType !== undefined) coachUpdate.employee_type = fields.employeeType;
+    if (fields.workingDays !== undefined) coachUpdate.working_days = fields.workingDays;
+    if (fields.gender !== undefined) coachUpdate.gender = fields.gender;
+    if (fields.dateOfBirth !== undefined) coachUpdate.date_of_birth = fields.dateOfBirth || null;
+    if (fields.address !== undefined) coachUpdate.address = fields.address;
+    if (fields.emergencyContactName !== undefined) coachUpdate.emergency_contact_name = fields.emergencyContactName;
+    if (fields.emergencyContactRelationship !== undefined) coachUpdate.emergency_contact_relationship = fields.emergencyContactRelationship;
+    if (fields.emergencyContactPhone !== undefined) coachUpdate.emergency_contact_phone = fields.emergencyContactPhone;
+    if (fields.emergencyContactAddress !== undefined) coachUpdate.emergency_contact_address = fields.emergencyContactAddress;
 
     if (Object.keys(coachUpdate).length > 0) {
       coachUpdate.updated_at = new Date().toISOString();
@@ -325,8 +347,8 @@ export async function PUT(req: Request) {
       if (coachErr) throw coachErr;
     }
 
-    // Update financial fields (Admin only)
-    if (hasRole(ctx, 'admin', 'superadmin')) {
+    // Update financial fields (Admin or Self)
+    if (hasRole(ctx, 'admin', 'superadmin') || coachId === ctx.userId) {
       const finUpdate: Record<string, any> = {};
       if (fields.salaryType !== undefined) finUpdate.salary_type = fields.salaryType;
       if (fields.fixedSalary !== undefined) finUpdate.fixed_salary = Number(fields.fixedSalary);
@@ -337,6 +359,7 @@ export async function PUT(req: Request) {
       if (fields.bankName !== undefined) finUpdate.bank_name = fields.bankName;
       if (fields.upiId !== undefined) finUpdate.upi_id = fields.upiId;
       if (fields.panNumber !== undefined) finUpdate.pan_number = fields.panNumber;
+      if (fields.bankAccountHolderName !== undefined) finUpdate.bank_account_holder_name = fields.bankAccountHolderName;
 
       if (Object.keys(finUpdate).length > 0) {
         finUpdate.updated_at = new Date().toISOString();
@@ -356,6 +379,8 @@ export async function PUT(req: Request) {
     }
     if (fields.phone !== undefined) userUpdate.phone = fields.phone;
     if (fields.avatarUrl !== undefined) userUpdate.avatar_url = fields.avatarUrl;
+    if (fields.alternatePhone !== undefined) userUpdate.alternate_phone = fields.alternatePhone;
+    if (fields.notificationPreferences !== undefined) userUpdate.notification_preferences = fields.notificationPreferences;
 
     if (Object.keys(userUpdate).length > 0) {
       const { error: userErr } = await db
@@ -367,6 +392,12 @@ export async function PUT(req: Request) {
 
     return ok({ success: true });
   } catch (e: unknown) {
-    return err(e instanceof Error ? e.message : 'Internal server error', 500);
+    console.error('[API PUT /coaches] Error detail:', e);
+    const errorMsg = e instanceof Error 
+      ? e.message 
+      : (typeof e === 'object' && e !== null && 'message' in e 
+          ? (e as any).message 
+          : String(e));
+    return err(errorMsg, 500);
   }
 }

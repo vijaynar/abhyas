@@ -47,6 +47,34 @@ export async function GET(request: Request) {
       if (user) {
         console.log('[Auth Callback] Session active. User authenticated:', user.id, user.email);
 
+        // Record last_login and login_device (best-effort, non-fatal)
+        try {
+          const userAgent = request.headers.get('user-agent') || '';
+          let loginDevice = 'Unknown Device';
+          if (/iPhone|iPad|iPod/.test(userAgent)) {
+            loginDevice = 'Safari on iOS';
+          } else if (/Android/.test(userAgent)) {
+            const b = /Chrome/.test(userAgent) ? 'Chrome' : /Firefox/.test(userAgent) ? 'Firefox' : 'Browser';
+            loginDevice = `${b} on Android`;
+          } else if (/Windows/.test(userAgent)) {
+            const b = /Edg\//.test(userAgent) ? 'Edge' : /Chrome/.test(userAgent) ? 'Chrome' : /Firefox/.test(userAgent) ? 'Firefox' : /Safari/.test(userAgent) ? 'Safari' : 'Browser';
+            loginDevice = `${b} on Windows`;
+          } else if (/Macintosh|Mac OS/.test(userAgent)) {
+            const b = /Edg\//.test(userAgent) ? 'Edge' : /Chrome/.test(userAgent) ? 'Chrome' : /Firefox/.test(userAgent) ? 'Firefox' : /Safari/.test(userAgent) ? 'Safari' : 'Browser';
+            loginDevice = `${b} on macOS`;
+          } else if (/Linux/.test(userAgent)) {
+            const b = /Chrome/.test(userAgent) ? 'Chrome' : /Firefox/.test(userAgent) ? 'Firefox' : 'Browser';
+            loginDevice = `${b} on Linux`;
+          }
+          await supabase
+            .from('users')
+            .update({ last_login: new Date().toISOString(), login_device: loginDevice })
+            .eq('id', user.id);
+          console.log('[Auth Callback] Login tracking updated:', loginDevice);
+        } catch (trackErr) {
+          console.warn('[Auth Callback] Login tracking failed (non-fatal):', trackErr);
+        }
+
         // Fetch user profile role from public database table to determine dashboard redirection
         // Falls back to student trigger values or app metadata if not loaded yet
         const { data: profile } = await supabase
