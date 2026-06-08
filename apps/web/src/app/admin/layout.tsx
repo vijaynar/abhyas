@@ -483,10 +483,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <select
                     value={profile.role}
                     onChange={(e) => handleSwitchRole(e.target.value)}
-                    className="bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/30 text-indigo-300 text-[10px] font-extrabold rounded-lg px-2 py-0.5 uppercase tracking-wider outline-none cursor-pointer transition-colors duration-200"
+                    className="role-switcher-select border border-indigo-500/30 text-[10px] font-extrabold rounded-lg px-2 py-0.5 uppercase tracking-wider outline-none cursor-pointer transition-colors duration-200"
                   >
                     {profile.available_roles.map((r) => (
-                      <option key={r} value={r} className="bg-[#0f111a] text-slate-300 uppercase">
+                      <option key={r} value={r}>
                         {r === 'superadmin' ? 'Super Admin' : r}
                       </option>
                     ))}

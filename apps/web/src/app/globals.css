@@ -248,8 +248,34 @@
 }
 [data-mode="light"] input,
 [data-mode="light"] textarea,
-[data-mode="light"] select { color: #0f172a !important; }
-[data-mode="light"] select option { background: #ffffff; color: #0f172a; }
+[data-mode="light"] select {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+}
+[data-mode="light"] select option,
+[data-mode="light"] .glass-panel select option,
+[data-mode="light"] .radial-mesh-bg select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* ── Role-switcher select in sidebar ── */
+.role-switcher-select {
+  background-color: rgba(30, 27, 75, 0.4); /* indigo-950/40 */
+  color: #a5b4fc; /* indigo-300 */
+}
+.role-switcher-select:hover {
+  background-color: rgba(49, 46, 129, 0.4); /* indigo-900/40 */
+}
+[data-mode="light"] .role-switcher-select {
+  background-color: rgba(99,102,241,0.10) !important;
+  color: #4338ca !important; /* indigo-700 */
+  border-color: rgba(99,102,241,0.35) !important;
+}
+[data-mode="light"] .role-switcher-select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
 
 /* Buttons */
 [data-mode="light"] .btn-secondary {
@@ -739,9 +765,14 @@ button, a, [role="button"] {
 
 /* ── INPUT AUTO-ZOOM & SIZING BALANCE ──────────────────────── */
 /* Balanced input sizing to match our premium dense UI typography on mobile */
+/* Default (dark mode): dropdown options use dark bg */
+select {
+  background-color: #0b0d19;
+  color: #f1f5f9;
+}
 select option {
-  background-color: #ffffff;
-  color: #0f172a;
+  background-color: #0b0d19;
+  color: #f1f5f9;
 }
 
 .radial-mesh-bg select option,
@@ -749,6 +780,22 @@ select option {
 [data-mode="dark"] select option {
   background-color: #0b0d19;
   color: #f1f5f9;
+}
+
+/* Light mode: always force white bg on select + options — overrides glass-panel rule above */
+[data-mode="light"] select,
+[data-mode="light"] .glass-panel select,
+[data-mode="light"] .radial-mesh-bg select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(0,0,0,0.15) !important;
+}
+[data-mode="light"] select option,
+[data-mode="light"] .glass-panel select option,
+[data-mode="light"] .radial-mesh-bg select option,
+[data-mode="light"] [data-mode="dark"] select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 

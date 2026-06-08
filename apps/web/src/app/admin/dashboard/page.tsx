@@ -1073,7 +1073,7 @@ export default function AdminDashboard() {
           .from('coaches')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenantId)
-          .eq('account_status', 'Pending Verification');
+          .not('account_status', 'in', '("Active","Inactive")');
 
         // Low attendance check (< 75% in 30 days)
         const range30Days = new Date();
@@ -2817,7 +2817,7 @@ export default function AdminDashboard() {
 
             {/* Row 5: Coach Approval Requests */}
             <Link
-              href="/admin/reports?tab=coach"
+              href="/admin/coaches"
               className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors"
             >
               <div className="flex items-center gap-2">
