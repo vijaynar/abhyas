@@ -98,6 +98,7 @@ function ReportsSubmenuList({
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [coachStatus, setCoachStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showTheme, setShowTheme] = useState(false);
@@ -156,6 +157,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
+        let status = null;
+        if (userProfile.role === 'coach') {
+          const { data: coachData } = await supabase
+            .from('coaches')
+            .select('account_status')
+            .eq('id', user.id)
+            .single();
+          if (coachData) {
+            status = coachData.account_status;
+          }
+        }
+        setCoachStatus(status);
         setProfile(userProfile as unknown as UserProfile);
       } catch (err) {
         console.error('Failed to authenticate admin:', err);
@@ -196,11 +209,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isCoach = profile?.role === 'coach';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
+  const isCoachActive = !isCoach || coachStatus === 'Active';
 
-  const coachActions = [
+  const coachActions = isCoachActive ? [
     { name: 'Mark Attendance', href: '/admin/attendance', icon: Camera },
-    { name: 'Scan Group Photo', href: '/admin/attendance/group-scan', icon: Camera },
-  ];
+    { name: 'Upload Group Photo', href: '/admin/attendance/group-scan', icon: Camera },
+  ] : [];
+
+  const isBlockedPath = isCoach && coachStatus !== 'Active' && (
+    pathname === '/admin/attendance' ||
+    pathname.startsWith('/admin/attendance/') ||
+    pathname === '/admin/leaves' ||
+    pathname.startsWith('/admin/leaves/') ||
+    pathname === '/admin/announcements' ||
+    pathname.startsWith('/admin/announcements/') ||
+    pathname === '/admin/reports' ||
+    pathname.startsWith('/admin/reports/') ||
+    pathname === '/admin/fines' ||
+    pathname.startsWith('/admin/fines/')
+  );
 
   const hasPermission = (module: string, action: string) => {
     if (!profile) return false;
@@ -231,13 +258,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(hasPermission('batches', 'view') ? [{ name: 'Batches', href: '/admin/batches', icon: Calendar }] : []),
     ...(isAdmin && hasPermission('coaches', 'view') ? [{ name: 'Coaches', href: '/admin/coaches', icon: UserCog }] : []),
     ...(hasPermission('students', 'view') ? [{ name: 'Students', href: '/admin/students', icon: Users }] : []),
-    ...(isCoach ? [
+    ...(isCoach && isCoachActive ? [
       { name: 'Leaves', href: '/admin/leaves', icon: Calendar },
       { name: 'Announcements', href: '/admin/announcements', icon: Megaphone }
     ] : []),
   ];
 
-  const reportsSubItems = [
+  const reportsSubItems = isCoachActive ? [
     ...(hasPermission('payments', 'view') ? [{ name: 'Fines & Payments', href: '/admin/fines' }] : []),
     ...(hasPermission('reports', 'view') ? [
       { name: 'Batch attendance', href: '/admin/reports?tab=batch' },
@@ -245,7 +272,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       { name: 'Student Progress', href: '/admin/reports?tab=student' },
       { name: 'Fine collection', href: '/admin/reports?tab=collection' },
     ] : []),
-  ];
+  ] : [];
 
   const isReportsActive = pathname === '/admin/fines' || pathname.startsWith('/admin/reports');
 
@@ -517,7 +544,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ── Main Content Area ── */}
       <main className="flex-1 flex flex-col md:h-screen md:overflow-y-auto no-scrollbar pt-16 md:pt-0">
         <div className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-300">
-          {children}
+          {isBlockedPath ? (
+            <div className="flex-1 flex items-center justify-center py-12">
+              <div className="max-w-md w-full glass-panel p-8 rounded-3xl text-center border border-rose-500/20 shadow-lg shadow-rose-500/5">
+                <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto mb-5 animate-pulse">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight mb-2">Access Restricted</h2>
+                <p className="text-xs text-slate-400 leading-relaxed mb-6">
+                  Your coach profile status is currently <span className="text-rose-400 font-bold">"{coachStatus || 'Pending'}"</span>. 
+                  Access to attendance, leaves, announcements, and reports is disabled until your account is activated by an administrator.
+                </p>
+                <button
+                  onClick={() => router.push('/admin/dashboard')}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  Go back to Dashboard
+                </button>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </main>
 

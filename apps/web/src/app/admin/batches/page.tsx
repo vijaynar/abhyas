@@ -195,6 +195,7 @@ export default function BatchesPage() {
   const [availableCoaches, setAvailableCoaches] = useState<AvailableCoach[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [coachStatus, setCoachStatus] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedCoachId, setSelectedCoachId] = useState<string>('');
   const [assignLoading, setAssignLoading] = useState(false);
@@ -238,7 +239,20 @@ export default function BatchesPage() {
         .select('role')
         .eq('id', user.id)
         .single();
-      if (profile) setUserRole((profile as { role: string }).role ?? '');
+      if (profile) {
+        const role = (profile as { role: string }).role ?? '';
+        setUserRole(role);
+        if (role === 'coach') {
+          const { data: coachProfile } = await supabase
+            .from('coaches')
+            .select('account_status')
+            .eq('id', user.id)
+            .single();
+          if (coachProfile) {
+            setCoachStatus(coachProfile.account_status);
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load user role:', err);
     }
@@ -1075,8 +1089,17 @@ export default function BatchesPage() {
                                     </span>
                                   )}
                                   <button
-                                    onClick={() => handleRequestAssignment(item.id)}
-                                    className="btn-secondary h-6 px-2 rounded-lg text-[9px] font-bold cursor-pointer whitespace-nowrap"
+                                    onClick={() => {
+                                      if (coachStatus !== 'Active') return;
+                                      handleRequestAssignment(item.id);
+                                    }}
+                                    disabled={coachStatus !== 'Active'}
+                                    className={`h-6 px-2 rounded-lg text-[9px] font-bold whitespace-nowrap transition-all ${
+                                      coachStatus === 'Active'
+                                        ? 'btn-secondary cursor-pointer'
+                                        : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50'
+                                    }`}
+                                    title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
                                   >
                                     {myAssignment?.status === 'rejected' ? 'Request Again' : 'Request Assignment'}
                                   </button>

@@ -395,14 +395,15 @@ export default function CoachProfilePage() {
 
     setAvatarUploading(true);
     try {
-      const path = `avatar_${user.id}_${Date.now()}.jpg`;
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `avatars/coach_${user.id}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from('student-portraits')
+        .from('avatars')
         .upload(path, file, { upsert: true, contentType: file.type });
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('student-portraits').getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
       const publicUrl = urlData.publicUrl;
 
       const { error: updateError } = await supabase
@@ -430,8 +431,19 @@ export default function CoachProfilePage() {
 
     setProfileSaving(true);
     try {
+      const hasAadhaar = !!documents['Aadhaar Card'];
+      const hasPan = !!documents['PAN Card'];
+      const hasQual = !!documents['Qualification Certificate'];
+      const hasAllMandatory = hasAadhaar && hasPan && hasQual;
+
+      let targetStatus = coach?.account_status;
+      if (coach?.account_status !== 'Active' && coach?.account_status !== 'Inactive') {
+        targetStatus = hasAllMandatory ? 'Pending Verification' : 'Document Upload Pending';
+      }
+
       const putBody = {
         coachId: user.id,
+        accountStatus: targetStatus,
         // user fields
         phone: editPhone,
         alternatePhone: editAlternatePhone,
@@ -513,6 +525,7 @@ export default function CoachProfilePage() {
         emergency_contact_address: editEmergencyContactAddress,
         bio: editBio,
         qualification: editQualification,
+        account_status: targetStatus,
       }));
 
       setFinancials({
@@ -887,11 +900,9 @@ export default function CoachProfilePage() {
               <p className="text-sm font-medium" style={{ color: 'var(--foreground-muted)' }}>
                 {coach.primary_skill || coach.expertise || 'Coach'}
               </p>
-              {coach.employee_id && (
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
-                  Unique Id: {coach.employee_id}
-                </p>
-              )}
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
+                Unique Id: {coach.employee_id || 'Generating...'}
+              </p>
             </div>
 
             {/* Horizontal 4 Box Metadata Grid */}
@@ -989,12 +1000,6 @@ export default function CoachProfilePage() {
                     </span>
                   </div>
                   <div className="flex flex-row items-start py-1">
-                    <span className="font-medium w-28 sm:w-36 shrink-0" style={{ color: 'var(--foreground-muted)' }}>Unique Id</span>
-                    <span className="font-normal break-words min-w-0 flex-1" style={{ color: 'var(--foreground)' }}>
-                      {coach.employee_id || '—'}
-                    </span>
-                  </div>
-                  <div className="flex flex-row items-start py-1">
                     <span className="font-medium w-28 sm:w-36 shrink-0" style={{ color: 'var(--foreground-muted)' }}>Email Address</span>
                     <span className="font-normal break-words min-w-0 flex-1 truncate" style={{ color: 'var(--foreground)' }}>
                       {user?.email || '—'}
@@ -1066,15 +1071,6 @@ export default function CoachProfilePage() {
                       type="text"
                       value={editLastName}
                       onChange={(e) => setEditLastName(e.target.value)}
-                      className="glass-input w-full rounded-xl px-3 py-2 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 dark:text-slate-400 font-bold mb-1.5">Unique Id</label>
-                    <input
-                      type="text"
-                      value={editEmployeeId}
-                      onChange={(e) => setEditEmployeeId(e.target.value)}
                       className="glass-input w-full rounded-xl px-3 py-2 focus:outline-none"
                     />
                   </div>
@@ -1676,10 +1672,12 @@ export default function CoachProfilePage() {
                 {documentTypes.map((docType) => {
                   const fileUrl = documents[docType];
                   const isUploading = docUploading === docType;
+                  const isMandatory = docType === 'Aadhaar Card' || docType === 'PAN Card' || docType === 'Qualification Certificate';
                   return (
                     <div key={docType} className="flex flex-row items-center py-1 first:pt-0 last:pb-0">
                       <span className="font-medium w-28 sm:w-36 shrink-0" style={{ color: 'var(--foreground-muted)' }}>
                         {docType}
+                        {isMandatory && <span className="text-red-500 ml-1 font-bold">*</span>}
                       </span>
                       <div className="flex-1 min-w-0 font-normal">
                         {fileUrl ? (
@@ -1693,37 +1691,43 @@ export default function CoachProfilePage() {
                               <Eye className="w-3.5 h-3.5" />
                               View
                             </a>
+                            {isEditing && (
+                              <button
+                                onClick={() => triggerDocUpload(docType)}
+                                disabled={isUploading}
+                                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                title="Reupload document"
+                              >
+                                {isUploading ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Upload className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          isEditing ? (
                             <button
                               onClick={() => triggerDocUpload(docType)}
                               disabled={isUploading}
-                              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                              title="Reupload document"
+                              className="text-indigo-500 hover:text-indigo-600 flex items-center gap-1.5 disabled:opacity-50 font-normal cursor-pointer"
                             >
                               {isUploading ? (
-                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                <>
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  uploading…
+                                </>
                               ) : (
-                                <Upload className="w-3.5 h-3.5" />
+                                <>
+                                  <Upload className="w-3.5 h-3.5" />
+                                  Upload
+                                </>
                               )}
                             </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => triggerDocUpload(docType)}
-                            disabled={isUploading}
-                            className="text-indigo-500 hover:text-indigo-600 flex items-center gap-1.5 disabled:opacity-50 font-normal"
-                          >
-                            {isUploading ? (
-                              <>
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                uploading…
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                Upload
-                              </>
-                            )}
-                          </button>
+                          ) : (
+                            <span className="text-xs text-slate-500 italic">Not Uploaded</span>
+                          )
                         )}
                       </div>
                     </div>

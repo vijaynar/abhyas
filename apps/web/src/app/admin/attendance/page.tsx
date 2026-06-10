@@ -358,7 +358,7 @@ export default function AttendanceLogsPage() {
             <Sparkles className="w-4 h-4" /> Academic Gatekeeping
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Daily Attendance Sheet
+            Daily Manual Attendance
           </h1>
         </div>
         <div className="flex items-center gap-3 self-start md:self-auto">
@@ -367,7 +367,7 @@ export default function AttendanceLogsPage() {
             className="bg-indigo-600 hover:bg-indigo-500 text-white h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all duration-200 glow-indigo flex-shrink-0"
           >
             <Camera className="w-4 h-4" />
-            Scan Group Photo
+            Mark Auto Attendance
           </button>
           <button
             onClick={() => loadAttendance(true)}
@@ -449,7 +449,7 @@ export default function AttendanceLogsPage() {
                 <tr>
                   <td colSpan={7} className="py-12 text-center">
                     <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin glow-indigo mx-auto mb-3" />
-                    <p className="text-xs text-slate-400">Loading daily attendance sheet...</p>
+                    <p className="text-xs text-slate-400">Loading daily manual attendance...</p>
                   </td>
                 </tr>
               ) : restrictionError ? (

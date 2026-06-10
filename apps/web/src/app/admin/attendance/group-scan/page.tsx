@@ -796,7 +796,7 @@ function GroupScanContent() {
             <Sparkles className="w-4 h-4" /> AI Biometric Attendance
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Daily Group Photo Analyzer
+            Daily Biometric Attendance
           </h1>
           <p className="text-xs text-slate-500 font-mono mt-0.5">
             Automatic batch recognition and auto-fines logging portal.
@@ -934,7 +934,7 @@ function GroupScanContent() {
           </div>
 
           {/* Photo Viewport Container */}
-          <div className="relative aspect-[4/3] rounded-3xl bg-slate-950 overflow-hidden border border-white/10 flex items-center justify-center">
+          <div className="relative aspect-[4/3] rounded-3xl bg-slate-950 overflow-hidden border border-slate-200 dark:border-white/10 flex items-center justify-center">
             
             {loadingModels && !isSimulator && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-4 bg-slate-950 z-20">
@@ -1025,18 +1025,18 @@ function GroupScanContent() {
               </div>
             ) : (
               <div className="p-8 text-center space-y-4 max-w-sm">
-                <div className="w-14 h-14 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-slate-400 mx-auto">
+                <div className="w-14 h-14 rounded-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 mx-auto">
                   <Upload className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Upload Group Photos</h3>
-                  <p className="text-[10px] text-slate-500 mt-1.5 leading-normal">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Upload Group Photos</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-normal">
                     Select one or more group photos or capture them directly using your camera. The AI will scan faces across all photos and accumulate attendance.
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 w-full">
-                  <label className="btn-secondary h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer justify-center flex-1">
-                    <Upload className="w-3.5 h-3.5" />
+                <div className="flex flex-col gap-3 w-full">
+                  <label className="h-10 px-6 rounded-xl text-xs font-extrabold flex items-center gap-2 cursor-pointer justify-center bg-indigo-600 hover:bg-indigo-700 text-white transition-all duration-200 shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 active:scale-98">
+                    <Upload className="w-4 h-4" />
                     Select Image Files
                     <input
                       type="file"
@@ -1046,25 +1046,27 @@ function GroupScanContent() {
                       className="hidden"
                     />
                   </label>
-                  {/* Native Mobile Camera Gateway (capture="environment") */}
-                  <label className="btn-secondary h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer justify-center flex-1 bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/10">
-                    <Camera className="w-3.5 h-3.5" />
-                    Capture via Camera
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                  <button
-                    onClick={() => setShowCamera(true)}
-                    className="btn-secondary h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer justify-center flex-1 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                  >
-                    <Camera className="w-3.5 h-3.5 text-indigo-400" />
-                    Use Web Camera
-                  </button>
+                  <div className="flex gap-3 w-full">
+                    {/* Native Mobile Camera Gateway (capture="environment") */}
+                    <label className="h-9 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer justify-center flex-1 border border-slate-200 dark:border-white/10 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+                      <Camera className="w-3.5 h-3.5 text-indigo-500" />
+                      Capture via Camera
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      onClick={() => setShowCamera(true)}
+                      className="h-9 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer justify-center flex-1 border border-slate-200 dark:border-white/10 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-indigo-500" />
+                      Use Web Camera
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

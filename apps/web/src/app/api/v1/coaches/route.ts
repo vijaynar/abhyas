@@ -248,7 +248,7 @@ export async function PUT(req: Request) {
     if (action === 'reactivate' || action === 'approve') {
       if (!hasRole(ctx, 'admin', 'superadmin')) return err('Forbidden', 403);
       
-      // Verification check: ensure Government ID is uploaded and Verified
+      // Verification check: ensure Government ID is uploaded
       if (action === 'approve') {
         const { data: docs, error: docsErr } = await db
           .from('coach_documents')
@@ -257,10 +257,21 @@ export async function PUT(req: Request) {
         
         if (docsErr) throw docsErr;
 
-        const hasVerifiedGovtId = docs?.some(d => d.document_type === 'Government ID' && d.verification_status === 'Verified');
+        const hasGovtId = docs?.some(d => d.document_type === 'Government ID');
 
-        if (!hasVerifiedGovtId) {
-          return err('Cannot activate coach: Government ID must be uploaded and verified first.', 400);
+        if (!hasGovtId) {
+          return err('Cannot activate coach: Government ID must be uploaded first.', 400);
+        }
+
+        // Auto-verify all pending documents for this coach upon approval
+        const { error: verifyErr } = await db
+          .from('coach_documents')
+          .update({ verification_status: 'Verified' })
+          .eq('coach_id', coachId)
+          .eq('verification_status', 'Pending');
+          
+        if (verifyErr) {
+          console.warn('[Coach Approval] Failed to auto-verify coach documents:', verifyErr.message);
         }
       }
 
@@ -324,6 +335,17 @@ export async function PUT(req: Request) {
     if (fields.galleryUrls !== undefined) coachUpdate.gallery_urls = fields.galleryUrls;
 
     // Redesigned profile new fields
+    if (fields.accountStatus !== undefined) {
+      if (ctx.role === 'coach') {
+        const { data: currCoach } = await db.from('coaches').select('account_status').eq('id', coachId).single();
+        const currStatus = currCoach?.account_status;
+        if (currStatus !== 'Active' && currStatus !== 'Inactive') {
+          coachUpdate.account_status = fields.accountStatus;
+        }
+      } else {
+        coachUpdate.account_status = fields.accountStatus;
+      }
+    }
     if (fields.employeeId !== undefined) coachUpdate.employee_id = fields.employeeId;
     if (fields.designation !== undefined) coachUpdate.designation = fields.designation;
     if (fields.department !== undefined) coachUpdate.department = fields.department;

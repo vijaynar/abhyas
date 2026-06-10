@@ -244,6 +244,7 @@ export default function AdminDashboard() {
   const [coachRecentAttendanceList, setCoachRecentAttendanceList] = useState<any[]>([]);
   const [coachNeedyStudentsList, setCoachNeedyStudentsList] = useState<any[]>([]);
   const [coachAnnouncements, setCoachAnnouncements] = useState<any[]>([]);
+  const [coachStatus, setCoachStatus] = useState<string>('Active');
 
 
   // Superadmin dashboard state
@@ -333,6 +334,15 @@ export default function AdminDashboard() {
 
       if (role === 'coach') {
         const now = new Date();
+
+        // Fetch Coach account status
+        const { data: coachProfile } = await supabase
+          .from('coaches')
+          .select('account_status')
+          .eq('id', user.id)
+          .single();
+        const statusVal = coachProfile?.account_status || 'Inactive';
+        setCoachStatus(statusVal);
 
         // 1. Fetch Coach Batches
         const { data: coachAssignments } = await supabase
@@ -1796,8 +1806,17 @@ export default function AdminDashboard() {
               </button>
             </div>
             <button
-              onClick={() => router.push('/admin/attendance')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all duration-200 glow-indigo"
+              onClick={() => {
+                if (coachStatus !== 'Active') return;
+                router.push('/admin/attendance');
+              }}
+              disabled={coachStatus !== 'Active'}
+              className={`h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 ${
+                coachStatus === 'Active'
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer glow-indigo'
+                  : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50'
+              }`}
+              title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
             >
               <Camera className="w-4 h-4" />
               Mark Attendance
@@ -2322,31 +2341,67 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-3 pt-3 flex-1">
                 <button
-                  onClick={() => router.push('/admin/attendance')}
-                  className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
+                  onClick={() => {
+                    if (coachStatus !== 'Active') return;
+                    router.push('/admin/attendance');
+                  }}
+                  disabled={coachStatus !== 'Active'}
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 group ${
+                    coachStatus === 'Active'
+                      ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] cursor-pointer'
+                      : 'bg-slate-900/40 border-white/5 cursor-not-allowed opacity-40'
+                  }`}
+                  title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
                 >
-                  <Camera className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <Camera className={`w-5 h-5 transition-transform ${coachStatus === 'Active' ? 'text-indigo-400 group-hover:scale-110' : 'text-slate-600'}`} />
                   <span className="text-[10px] font-bold text-slate-300">Mark Attendance</span>
                 </button>
                 <button
-                  onClick={() => router.push('/admin/attendance/group-scan')}
-                  className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
+                  onClick={() => {
+                    if (coachStatus !== 'Active') return;
+                    router.push('/admin/attendance/group-scan');
+                  }}
+                  disabled={coachStatus !== 'Active'}
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 group ${
+                    coachStatus === 'Active'
+                      ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] cursor-pointer'
+                      : 'bg-slate-900/40 border-white/5 cursor-not-allowed opacity-40'
+                  }`}
+                  title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
                 >
-                  <Camera className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-bold text-slate-300">Scan Group Photo</span>
+                  <Camera className={`w-5 h-5 transition-transform ${coachStatus === 'Active' ? 'text-purple-400 group-hover:scale-110' : 'text-slate-600'}`} />
+                  <span className="text-[10px] font-bold text-slate-300">Upload Group Photo</span>
                 </button>
                 <button
-                  onClick={() => router.push('/admin/leaves')}
-                  className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
+                  onClick={() => {
+                    if (coachStatus !== 'Active') return;
+                    router.push('/admin/leaves');
+                  }}
+                  disabled={coachStatus !== 'Active'}
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 group ${
+                    coachStatus === 'Active'
+                      ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] cursor-pointer'
+                      : 'bg-slate-900/40 border-white/5 cursor-not-allowed opacity-40'
+                  }`}
+                  title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
                 >
-                  <Calendar className="w-5 h-5 text-emerald-400/90 group-hover:scale-110 transition-transform" />
+                  <Calendar className={`w-5 h-5 transition-transform ${coachStatus === 'Active' ? 'text-emerald-400/90 group-hover:scale-110' : 'text-slate-600'}`} />
                   <span className="text-[10px] font-bold text-slate-300">Apply Leave</span>
                 </button>
                 <button
-                  onClick={() => router.push('/admin/announcements')}
-                  className="p-2.5 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer"
+                  onClick={() => {
+                    if (coachStatus !== 'Active') return;
+                    router.push('/admin/announcements');
+                  }}
+                  disabled={coachStatus !== 'Active'}
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 group ${
+                    coachStatus === 'Active'
+                      ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] cursor-pointer'
+                      : 'bg-slate-900/40 border-white/5 cursor-not-allowed opacity-40'
+                  }`}
+                  title={coachStatus !== 'Active' ? 'Disabled until account is Active' : ''}
                 >
-                  <Megaphone className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
+                  <Megaphone className={`w-5 h-5 transition-transform ${coachStatus === 'Active' ? 'text-rose-400 group-hover:scale-110' : 'text-slate-600'}`} />
                   <span className="text-[10px] font-bold text-slate-300">Add Announcement</span>
                 </button>
               </div>
