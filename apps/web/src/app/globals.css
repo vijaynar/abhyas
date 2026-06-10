@@ -785,7 +785,13 @@ select option {
 /* Light mode: always force white bg on select + options — overrides glass-panel rule above */
 [data-mode="light"] select,
 [data-mode="light"] .glass-panel select,
-[data-mode="light"] .radial-mesh-bg select {
+[data-mode="light"] .radial-mesh-bg select,
+select.bg-white,
+select[class*="bg-slate-50"],
+select[class*="bg-slate-100"],
+select[class*="bg-gray-"],
+select[class*="bg-indigo-50"],
+.bg-\[\#f8fafc\] select {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: rgba(0,0,0,0.15) !important;
@@ -793,7 +799,16 @@ select option {
 [data-mode="light"] select option,
 [data-mode="light"] .glass-panel select option,
 [data-mode="light"] .radial-mesh-bg select option,
-[data-mode="light"] [data-mode="dark"] select option {
+[data-mode="light"] [data-mode="dark"] select option,
+select.bg-white option,
+select[class*="bg-white"] option,
+select[class*="bg-slate-50"] option,
+select[class*="bg-slate-100"] option,
+select[class*="bg-gray-"] option,
+select[class*="bg-indigo-50"] option,
+.bg-\[\#f8fafc\] select option,
+div[class*="bg-white"] select option,
+div[class*="bg-slate-50"] select option {
   background-color: #ffffff !important;
   color: #0f172a !important;
 }

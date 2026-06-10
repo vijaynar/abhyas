@@ -84,6 +84,7 @@ interface CoachProfile {
   service_types: string[] | null;
   class_types: string[] | null;
   languages_known: string[] | null;
+  account_status: string | null;
 }
 
 interface FinancialSettings {
@@ -175,6 +176,7 @@ export default function CoachProfilePage() {
     service_types: [],
     class_types: [],
     languages_known: [],
+    account_status: '',
   });
 
   const [financials, setFinancials] = useState<FinancialSettings>({
@@ -285,7 +287,8 @@ export default function CoachProfilePage() {
               employee_id, designation, department, specialization, employee_type, working_days,
               gender, date_of_birth, address, emergency_contact_name, emergency_contact_relationship,
               emergency_contact_phone, emergency_contact_address, joining_date, bio, qualification,
-              avg_rating, state, city, area, service_types, class_types, languages_known
+              avg_rating, state, city, area, service_types, class_types, languages_known,
+              account_status
             `)
             .eq('id', userId)
             .single(),
@@ -869,8 +872,16 @@ export default function CoachProfilePage() {
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
                   {coach.avg_rating != null ? Number(coach.avg_rating).toFixed(1) : '4.8'}
                 </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                  Active
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  coach.account_status === 'Active'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900'
+                    : coach.account_status === 'Document Upload Pending'
+                    ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900'
+                    : coach.account_status === 'Pending Verification'
+                    ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900'
+                    : 'bg-slate-50 dark:bg-slate-950/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-900'
+                }`}>
+                  {coach.account_status || 'Inactive'}
                 </span>
               </div>
               <p className="text-sm font-medium" style={{ color: 'var(--foreground-muted)' }}>

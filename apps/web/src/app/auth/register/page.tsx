@@ -83,6 +83,12 @@ function RegisterContent() {
   // COACH ONBOARDING STATES
   // ----------------------------------------------------
   const [coachStep, setCoachStep] = useState(1);
+  const [maxCoachStepReached, setMaxCoachStepReached] = useState(1);
+  useEffect(() => {
+    if (coachStep > maxCoachStepReached) {
+      setMaxCoachStepReached(coachStep);
+    }
+  }, [coachStep, maxCoachStepReached]);
   const [onboardPhoto, setOnboardPhoto] = useState<File | null>(null);
   const [onboardPhotoPreview, setOnboardPhotoPreview] = useState<string>('');
   
@@ -495,11 +501,11 @@ function RegisterContent() {
   const isPhoneValid = coachPhone.length === 10;
 
   // Screen level form validation states
-  const isStep1Valid = coachFirstName.trim() !== '' && coachLastName.trim() !== '' && isEmailValid && isPhoneValid && isCoachPasswordValid && coachGender !== '' && coachDOB !== '' && coachCountry.trim() !== '' && coachState.trim() !== '' && coachCity.trim() !== '';
+  const isStep1Valid = coachFirstName.trim() !== '' && coachLastName.trim() !== '' && isEmailValid && isPhoneValid && coachGender !== '' && coachDOB !== '' && coachCountry.trim() !== '' && coachState.trim() !== '' && coachCity.trim() !== '';
   const isStep2Valid = primarySkill.trim() !== '' && specialization.trim() !== '' && experienceYears.trim() !== '' && qualification.trim() !== '' && serviceTypes.length > 0 && classTypes.length > 0 && bio.trim() !== '' && bio.length <= 500;
   // Step 3 = Documents (no strict validation, optional)
   const isStep3Valid = true;
-  const isStep4Valid = true;
+  const isStep4Valid = isCoachPasswordValid;
 
   if (isCoach) {
     return (
@@ -529,13 +535,19 @@ function RegisterContent() {
               {COACH_STEPS.map((s) => {
                 const isActive = coachStep === s.id;
                 const isCompleted = coachStep > s.id;
+                const isClickable = s.id <= maxCoachStepReached;
                 return (
-                  <div
+                  <button
                     key={s.id}
-                    className={`flex items-start gap-4 p-3 rounded-2xl transition-all duration-300 ${
+                    type="button"
+                    disabled={!isClickable}
+                    onClick={() => setCoachStep(s.id)}
+                    className={`w-full text-left flex items-start gap-4 p-3 rounded-2xl transition-all duration-300 ${
                       isActive 
                         ? 'bg-indigo-50 border border-indigo-100' 
                         : 'border border-transparent'
+                    } ${
+                      isClickable ? 'cursor-pointer hover:bg-slate-50' : 'cursor-not-allowed opacity-60'
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold transition-all ${
@@ -559,7 +571,7 @@ function RegisterContent() {
                         {s.desc}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -612,31 +624,41 @@ function RegisterContent() {
               
               {/* Stepper horizontal dots */}
               <div className="hidden md:flex items-center justify-between w-full mb-10 border-b border-slate-200 pb-5">
-                {COACH_STEPS.map((s, idx) => (
-                  <div key={s.id} className="flex items-center flex-1 last:flex-none">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                        coachStep === s.id
-                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                          : coachStep > s.id
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-slate-100 text-slate-400 border border-slate-200'
-                      }`}>
-                        {coachStep > s.id ? <Check className="w-4 h-4 stroke-[3]" /> : s.id}
-                      </div>
-                      <span className={`text-xs font-semibold whitespace-nowrap ${
-                        coachStep === s.id ? 'text-slate-900 font-bold' : 'text-slate-400'
-                      }`}>
-                        {s.name}
-                      </span>
+                {COACH_STEPS.map((s, idx) => {
+                  const isClickable = s.id <= maxCoachStepReached;
+                  return (
+                    <div key={s.id} className="flex items-center flex-1 last:flex-none">
+                      <button
+                        type="button"
+                        disabled={!isClickable}
+                        onClick={() => setCoachStep(s.id)}
+                        className={`flex items-center gap-2 outline-none text-left transition-all ${
+                          isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                          coachStep === s.id
+                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                            : coachStep > s.id
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-slate-100 text-slate-400 border border-slate-200'
+                        }`}>
+                          {coachStep > s.id ? <Check className="w-4 h-4 stroke-[3]" /> : s.id}
+                        </div>
+                        <span className={`text-xs font-semibold whitespace-nowrap ${
+                          coachStep === s.id ? 'text-slate-900 font-bold' : 'text-slate-400'
+                        }`}>
+                          {s.name}
+                        </span>
+                      </button>
+                      {idx < COACH_STEPS.length - 1 && (
+                        <div className={`h-[2px] flex-1 mx-4 min-w-[20px] transition-colors duration-300 ${
+                          coachStep > s.id ? 'bg-emerald-500' : 'bg-slate-200'
+                        }`} />
+                      )}
                     </div>
-                    {idx < COACH_STEPS.length - 1 && (
-                      <div className={`h-[2px] flex-1 mx-4 min-w-[20px] transition-colors duration-300 ${
-                        coachStep > s.id ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`} />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Error Box */}
@@ -827,64 +849,6 @@ function RegisterContent() {
                           className="w-full h-11 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none text-sm text-slate-800 bg-white"
                         />
                         <p className="text-[10px] text-slate-400">Must be at least 18 years old</p>
-                      </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="space-y-1">
-                      <label className="text-slate-700 text-xs font-bold block">Password <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <input
-                          type={coachShowPassword ? 'text' : 'password'}
-                          required
-                          value={coachPassword}
-                          onChange={(e) => setCoachPassword(e.target.value)}
-                          placeholder="••••••••••••"
-                          className="w-full h-11 pl-4 pr-10 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none text-sm text-slate-800 bg-white font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setCoachShowPassword(!coachShowPassword)}
-                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 transition-colors"
-                        >
-                          {coachShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-
-                      {/* Password Criteria Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-[11px] text-slate-500">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                            coachHasLength ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                          }`}>
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          </span>
-                          <span className={coachHasLength ? 'text-emerald-700' : ''}>At least 8 characters</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                            coachHasUppercase ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                          }`}>
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          </span>
-                          <span className={coachHasUppercase ? 'text-emerald-700' : ''}>One uppercase letter</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                            coachHasNumber ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                          }`}>
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          </span>
-                          <span className={coachHasNumber ? 'text-emerald-700' : ''}>One number</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                            coachHasSpecial ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                          }`}>
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          </span>
-                          <span className={coachHasSpecial ? 'text-emerald-700' : ''}>One special character</span>
-                        </div>
                       </div>
                     </div>
 
@@ -1233,6 +1197,64 @@ function RegisterContent() {
                       </p>
                     </div>
 
+                    {/* Password */}
+                    <div className="space-y-1">
+                      <label className="text-slate-700 text-xs font-bold block">Password <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <input
+                          type={coachShowPassword ? 'text' : 'password'}
+                          required
+                          value={coachPassword}
+                          onChange={(e) => setCoachPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full h-11 pl-4 pr-10 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none text-sm text-slate-800 bg-white font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCoachShowPassword(!coachShowPassword)}
+                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                          {coachShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Password Criteria Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            coachHasLength ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={coachHasLength ? 'text-emerald-700' : ''}>At least 8 characters</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            coachHasUppercase ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={coachHasUppercase ? 'text-emerald-700' : ''}>One uppercase letter</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            coachHasNumber ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={coachHasNumber ? 'text-emerald-700' : ''}>One number</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            coachHasSpecial ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                          <span className={coachHasSpecial ? 'text-emerald-700' : ''}>One special character</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Phone Verification Box - Disabled */}
                     <div className="border border-slate-100 bg-slate-50/50 p-6 rounded-2xl relative space-y-4">
                       <div className="flex items-center justify-between">
@@ -1475,7 +1497,8 @@ function RegisterContent() {
                       disabled={
                         (coachStep === 1 && !isStep1Valid) ||
                         (coachStep === 2 && !isStep2Valid) ||
-                        (coachStep === 3 && !isStep3Valid)
+                        (coachStep === 3 && !isStep3Valid) ||
+                        (coachStep === 4 && !isStep4Valid)
                       }
                       className="inline-flex items-center px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
