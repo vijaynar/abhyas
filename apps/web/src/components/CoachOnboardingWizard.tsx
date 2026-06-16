@@ -50,6 +50,7 @@ interface CoachOnboardingWizardProps {
   onCancel: () => void;
   onSuccess: (userId: string) => void;
   theme?: 'light' | 'dark';
+  testMode?: boolean;
 }
 
 export function CoachOnboardingWizard({
@@ -57,7 +58,8 @@ export function CoachOnboardingWizard({
   tenantId,
   onCancel,
   onSuccess,
-  theme = 'light'
+  theme = 'light',
+  testMode = false
 }: CoachOnboardingWizardProps) {
   const supabase = createBrowserClient();
   const isDark = theme === 'dark';
@@ -499,7 +501,7 @@ export function CoachOnboardingWizard({
               <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>Step {step} of 5</h3>
               <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{STEPS_LIST[step - 1].name}</p>
             </div>
-            {isAdminMode && (
+            {(isAdminMode || testMode) && (
               <button
                 type="button"
                 onClick={fillRandomData}
@@ -522,17 +524,24 @@ export function CoachOnboardingWizard({
 
         <form onSubmit={handleSubmit} className="p-6 flex-1 flex flex-col justify-between space-y-6 min-h-[480px]">
           
-          {/* STEP 1: Personal details */}
+          {/* STEP 1: Personal Information */}
           {step === 1 && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                  {isAdminMode ? "Coach's Basic Information" : "Let's start with your basic info"}
+                </h3>
+                <span className="text-[10px] font-semibold text-red-500">* Required fields</span>
+              </div>
+
               <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 rounded-full overflow-hidden border flex items-center justify-center shrink-0 ${
+                <div className={`w-20 h-20 rounded-full overflow-hidden border flex items-center justify-center shrink-0 ${
                   isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'
                 }`}>
                   {avatarPreview ? (
                     <img src={avatarPreview} className="w-full h-full object-cover" alt="Avatar preview" />
                   ) : (
-                    <User className="w-8 h-8 text-slate-400" />
+                    <User className="w-10 h-10 text-slate-400" />
                   )}
                 </div>
                 <div className="space-y-1">
@@ -540,7 +549,7 @@ export function CoachOnboardingWizard({
                     isDark ? 'border-white/10 bg-white/5 hover:bg-white/10 text-slate-300' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-850'
                   }`}>
                     <Camera className="w-3.5 h-3.5 mr-1.5" />
-                    Select Photo
+                    Upload Photo
                     <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                   </label>
                   <p className="text-[10px] text-slate-400">JPG, PNG up to 2MB</p>
@@ -579,22 +588,32 @@ export function CoachOnboardingWizard({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium mb-1">Email Address <span className="text-red-500 ml-1">*</span></label>
-                  <input
-                    required
-                    type="email"
-                    placeholder="rahul@academy.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => setEmailTouched(true)}
-                    className={`rounded-xl px-3 py-2 text-xs w-full outline-none focus:ring-1 focus:ring-indigo-500 border ${
-                      isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                    } ${emailTouched && !isEmailValid ? 'border-red-400 bg-red-50/10' : ''}`}
-                  />
+                  <div className="relative">
+                    <input
+                      required
+                      type="email"
+                      placeholder="rahul@academy.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => setEmailTouched(true)}
+                      className={`rounded-xl px-3 py-2 pr-8 text-xs w-full outline-none focus:ring-1 focus:ring-indigo-500 border ${
+                        isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
+                      } ${emailTouched && !isEmailValid ? 'border-red-400 bg-red-50/10' : ''}`}
+                    />
+                    {email && isEmailValid && (
+                      <Check className="absolute right-3 top-2.5 w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+                    )}
+                    {emailTouched && !isEmailValid && email && (
+                      <AlertCircle className="absolute right-3 top-2.5 w-3.5 h-3.5 text-red-400" />
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Mobile Number <span className="text-red-500 ml-1">*</span></label>
+                  <label className="block text-xs font-medium mb-1">Phone Number <span className="text-red-500 ml-1">*</span></label>
                   <div className="relative flex items-center">
-                    <span className="absolute left-3 text-xs text-slate-400 font-semibold">+91</span>
+                    <span className="absolute left-3 flex items-center gap-0.5 text-xs text-slate-400 font-semibold">
+                      <span>🇮🇳</span><span className="ml-0.5">+91</span>
+                    </span>
                     <input
                       required
                       type="tel"
@@ -602,7 +621,7 @@ export function CoachOnboardingWizard({
                       placeholder="9876543210"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                      className={`rounded-xl pl-12 pr-3 py-2 text-xs w-full outline-none focus:ring-1 focus:ring-indigo-500 border ${
+                      className={`rounded-xl pl-16 pr-3 py-2 text-xs w-full outline-none focus:ring-1 focus:ring-indigo-500 border ${
                         isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
                       }`}
                     />
@@ -623,6 +642,7 @@ export function CoachOnboardingWizard({
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
                   </select>
                 </div>
                 <div>
@@ -631,30 +651,37 @@ export function CoachOnboardingWizard({
                     required
                     type="date"
                     value={dob}
+                    max={new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                     onChange={(e) => setDob(e.target.value)}
                     className={`rounded-xl px-3 py-2 text-xs w-full outline-none focus:ring-1 focus:ring-indigo-500 border ${
                       isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
                     }`}
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Must be at least 18 years old</p>
                 </div>
               </div>
 
-              <div className="border-t border-slate-200/20 pt-4 mt-4 space-y-4">
-                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-indigo-400' : 'text-indigo-650'}`}>Address & Location</h4>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="col-span-2 md:col-span-1">
-                    <label className="block text-xs font-medium mb-1">Country <span className="text-red-500 ml-1">*</span></label>
-                    <input
-                      required
-                      type="text"
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      className={`rounded-xl px-3 py-2 text-xs w-full outline-none border ${
-                        isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                      }`}
-                    />
-                  </div>
+              <div className={`border-t pt-4 mt-2 space-y-3 ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                <h4 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Address & Location Details</h4>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1">Country <span className="text-red-500 ml-1">*</span></label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className={`rounded-xl px-3 py-2 text-xs w-full outline-none border ${
+                      isDark ? 'glass-input border-white/10 bg-[#060814] text-slate-200' : 'border-slate-200 bg-white text-slate-800'
+                    }`}
+                  >
+                    <option value="India">India</option>
+                    <option value="USA">United States</option>
+                    <option value="UK">United Kingdom</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Australia">Australia</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1">State <span className="text-red-500 ml-1">*</span></label>
                     <input
@@ -681,30 +708,38 @@ export function CoachOnboardingWizard({
                       }`}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Area <span className="text-red-500 ml-1">*</span></label>
-                    <input
-                      required
-                      type="text"
-                      placeholder="Indiranagar"
-                      value={areaName}
-                      onChange={(e) => setAreaName(e.target.value)}
-                      className={`rounded-xl px-3 py-2 text-xs w-full outline-none border ${
-                        isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                      }`}
-                    />
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    Area / Locality <span className={`font-normal text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Indiranagar"
+                    value={areaName}
+                    onChange={(e) => setAreaName(e.target.value)}
+                    className={`rounded-xl px-3 py-2 text-xs w-full outline-none border ${
+                      isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
+                    }`}
+                  />
+                </div>
+
+                <div className={`grid grid-cols-1 gap-3 ${isAdminMode ? 'md:grid-cols-2' : ''}`}>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Full Physical Address</label>
-                    <input
-                      type="text"
-                      placeholder="123, 5th Main Road"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium">
+                        Full Address <span className={`font-normal text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>(Optional)</span>
+                      </label>
+                      <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{addressLine.length}/200</span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      placeholder="123, 5th Main Road, Indiranagar"
                       value={addressLine}
                       onChange={(e) => setAddressLine(e.target.value)}
-                      className={`rounded-xl px-3 py-2 text-xs w-full outline-none border ${
+                      className={`rounded-xl px-3 py-2 text-xs w-full outline-none border resize-none ${
                         isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
                       }`}
                     />
@@ -730,9 +765,13 @@ export function CoachOnboardingWizard({
           {/* STEP 2: Professional Profile */}
           {step === 2 && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Professional Profile</h3>
+                <span className="text-[10px] font-semibold text-red-500">* Required fields</span>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Coaching Specialty Domain <span className="text-red-500 ml-1">*</span></label>
+                  <label className="block text-xs font-medium mb-1">Primary Skill / Subject <span className="text-red-500 ml-1">*</span></label>
                   <select
                     value={primarySkill}
                     onChange={(e) => setPrimarySkill(e.target.value)}
@@ -759,7 +798,7 @@ export function CoachOnboardingWizard({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Years of Experience <span className="text-red-500 ml-1">*</span></label>
+                  <label className="block text-xs font-medium mb-1">Experience (in years) <span className="text-red-500 ml-1">*</span></label>
                   <input
                     required
                     type="number"
@@ -772,7 +811,7 @@ export function CoachOnboardingWizard({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Highest Professional Qualification <span className="text-red-500 ml-1">*</span></label>
+                  <label className="block text-xs font-medium mb-1">Qualification <span className="text-red-500 ml-1">*</span></label>
                   <input
                     required
                     type="text"
@@ -802,15 +841,29 @@ export function CoachOnboardingWizard({
                     value={langInput}
                     onChange={(e) => setLangInput(e.target.value)}
                     onKeyDown={addLanguage}
-                    placeholder="Add language + Enter"
+                    placeholder="Type + Enter to add"
                     className="flex-1 min-w-[120px] bg-transparent outline-none border-none text-xs px-1 text-slate-600 dark:text-slate-300"
                   />
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {LANGUAGES_ONBOARD.filter(l => !languagesKnown.includes(l)).map(l => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setLanguagesKnown(prev => [...prev, l])}
+                      className={`px-2 py-0.5 rounded-md border text-[10px] font-medium transition-colors ${
+                        isDark ? 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      + {l}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5">Service Types</label>
+                  <label className="block text-xs font-medium mb-1.5">Service Types <span className={`font-normal text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>(Select all that apply)</span></label>
                   <div className="flex flex-wrap gap-1.5">
                     {SERVICE_TYPES_ONBOARD.map(svc => {
                       const isSelected = serviceTypes.includes(svc.value);
@@ -819,12 +872,13 @@ export function CoachOnboardingWizard({
                           key={svc.value}
                           type="button"
                           onClick={() => setServiceTypes(prev => isSelected ? prev.filter(s => s !== svc.value) : [...prev, svc.value])}
-                          className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all ${
+                          className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all flex items-center gap-1 ${
                             isSelected
                               ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                               : (isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200')
                           }`}
                         >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                           {svc.label}
                         </button>
                       );
@@ -832,7 +886,7 @@ export function CoachOnboardingWizard({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1.5">Class Types</label>
+                  <label className="block text-xs font-medium mb-1.5">Class Types <span className={`font-normal text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>(Select all that apply)</span></label>
                   <div className="flex flex-wrap gap-1.5">
                     {CLASS_TYPES_ONBOARD.map(cls => {
                       const isSelected = classTypes.includes(cls.value);
@@ -841,12 +895,13 @@ export function CoachOnboardingWizard({
                           key={cls.value}
                           type="button"
                           onClick={() => setClassTypes(prev => isSelected ? prev.filter(c => c !== cls.value) : [...prev, cls.value])}
-                          className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all ${
+                          className={`px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all flex items-center gap-1 ${
                             isSelected
                               ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                               : (isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200')
                           }`}
                         >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                           {cls.label}
                         </button>
                       );
@@ -904,7 +959,10 @@ export function CoachOnboardingWizard({
               )}
 
               <div>
-                <label className="block text-xs font-medium mb-1">Professional Bio (min 20 characters) <span className="text-red-500 ml-1">*</span></label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium">Professional Bio <span className="text-red-500 ml-1">*</span></label>
+                  <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{bio.length}/500</span>
+                </div>
                 <textarea
                   rows={2}
                   maxLength={500}
@@ -988,9 +1046,14 @@ export function CoachOnboardingWizard({
             </div>
           )}
 
-          {/* STEP 4: Account Security & Bank Details */}
+          {/* STEP 4: Account Security */}
           {step === 4 && (
             <div className="space-y-4">
+              <div>
+                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Secure Your Account</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Create a strong password to protect the coach's account.</p>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium mb-1">Password <span className="text-red-500 ml-1">*</span></label>
                 <div className="relative">
@@ -1014,125 +1077,94 @@ export function CoachOnboardingWizard({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-[10px] text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${hasLength ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>✓</span>
-                    <span>Min 8 characters</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${hasLength ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                    <span className={hasLength ? 'text-emerald-600' : ''}>At least 8 characters</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${hasUppercase ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>✓</span>
-                    <span>One uppercase</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${hasUppercase ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                    <span className={hasUppercase ? 'text-emerald-600' : ''}>One uppercase letter</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${hasNumber ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>✓</span>
-                    <span>One number</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${hasNumber ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                    <span className={hasNumber ? 'text-emerald-600' : ''}>One number</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${hasSpecial ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>✓</span>
-                    <span>One special char</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${hasSpecial ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-200 text-slate-400'}`}>
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                    <span className={hasSpecial ? 'text-emerald-600' : ''}>One special character</span>
                   </div>
                 </div>
               </div>
-
-              {/* Bank Ledger info */}
-              {isAdminMode && (
-                <div className={`p-4 border rounded-2xl space-y-3 ${isDark ? 'border-white/5 bg-white/[0.01]' : 'border-slate-100 bg-slate-50/20'}`}>
-                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-1">
-                    <Landmark className="w-3.5 h-3.5" /> Bank Account Details
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[9px] text-slate-500 mb-1">Bank Name</label>
-                      <input
-                        type="text"
-                        placeholder="ICICI Bank"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        className={`rounded-xl px-2 py-1 text-xs w-full outline-none border ${
-                          isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-slate-500 mb-1">Account Number</label>
-                      <input
-                        type="text"
-                        placeholder="9120..."
-                        value={bankAccountNumber}
-                        onChange={(e) => setBankAccountNumber(e.target.value)}
-                        className={`rounded-xl px-2 py-1 text-xs w-full outline-none border ${
-                          isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-slate-500 mb-1">IFSC Code</label>
-                      <input
-                        type="text"
-                        placeholder="ICIC0000102"
-                        value={bankIfscCode}
-                        onChange={(e) => setBankIfscCode(e.target.value)}
-                        className={`rounded-xl px-2 py-1 text-xs w-full outline-none border ${
-                          isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-slate-500 mb-1">UPI ID</label>
-                      <input
-                        type="text"
-                        placeholder="rahul@okicici"
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        className={`rounded-xl px-2 py-1 text-xs w-full outline-none border ${
-                          isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-slate-500 mb-1">PAN Number</label>
-                      <input
-                        type="text"
-                        placeholder="ABCDE1234F"
-                        value={panNumber}
-                        onChange={(e) => setPanNumber(e.target.value)}
-                        className={`rounded-xl px-2 py-1 text-xs w-full outline-none border ${
-                          isDark ? 'glass-input border-white/10 bg-[#060814]/40 text-slate-200' : 'border-slate-200 bg-white text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
           {/* STEP 5: Review & Submit */}
           {step === 5 && (
-            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[340px] overflow-y-auto pr-1">
+              <div>
+                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Review Your Information</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Please review all details before submitting.</p>
+              </div>
+
+              {/* Personal Info Card */}
               <div className={`p-4 border rounded-xl relative ${isDark ? 'border-white/5 bg-white/[0.01]' : 'border-slate-200 bg-slate-50/50'}`}>
-                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Personal Information</h4>
-                <div className="grid grid-cols-2 gap-y-2 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Full Name</span>
-                    <span className="font-semibold">{firstName} {lastName}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Email Address</span>
-                    <span className="font-semibold">{email}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Mobile Phone</span>
-                    <span className="font-semibold">+91 {phone}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Gender / DOB</span>
-                    <span className="font-semibold">{gender} / {dob}</span>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="absolute top-4 right-4 text-indigo-500 hover:text-indigo-700 text-xs font-bold transition-colors"
+                >
+                  Edit
+                </button>
+                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-3">Personal Information</h4>
+                <div className="flex items-start gap-3">
+                  {avatarPreview && (
+                    <div className="w-12 h-12 rounded-full overflow-hidden border shrink-0">
+                      <img src={avatarPreview} className="w-full h-full object-cover" alt="Avatar" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-y-2 text-xs flex-1">
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Full Name</span>
+                      <span className="font-semibold">{firstName} {lastName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Email Address</span>
+                      <span className="font-semibold">{email}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Mobile Phone</span>
+                      <span className="font-semibold">+91 {phone}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Gender / DOB</span>
+                      <span className="font-semibold">{gender} / {dob}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-500 block text-[9px]">Location</span>
+                      <span className="font-semibold">{areaName ? `${areaName}, ` : ''}{cityName}, {stateName}, {country}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              {/* Professional Credentials Card */}
               <div className={`p-4 border rounded-xl relative ${isDark ? 'border-white/5 bg-white/[0.01]' : 'border-slate-200 bg-slate-50/50'}`}>
-                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Professional Credentials</h4>
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="absolute top-4 right-4 text-indigo-500 hover:text-indigo-700 text-xs font-bold transition-colors"
+                >
+                  Edit
+                </button>
+                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-3">Professional Credentials</h4>
                 <div className="grid grid-cols-2 gap-y-2 text-xs">
                   <div>
                     <span className="text-slate-500 block text-[9px]">Skill Domain</span>
@@ -1140,41 +1172,42 @@ export function CoachOnboardingWizard({
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[9px]">Experience / Qualification</span>
-                    <span className="font-semibold">{experienceYears} Years / {qualification}</span>
+                    <span className="font-semibold">{experienceYears} Yrs · {qualification}</span>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-500 block text-[9px]">Languages Known</span>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Languages</span>
                     <span className="font-semibold">{languagesKnown.join(', ')}</span>
                   </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Service / Class Types</span>
+                    <span className="font-semibold">{serviceTypes.join(', ')} · {classTypes.join(', ')}</span>
+                  </div>
+                  {bio && (
+                    <div className="col-span-2">
+                      <span className="text-slate-500 block text-[9px]">Bio</span>
+                      <span className="font-semibold text-[10px] leading-relaxed">{bio.length > 120 ? bio.slice(0, 120) + '…' : bio}</span>
+                    </div>
+                  )}
                   {isAdminMode && (
                     <div className="col-span-2">
-                      <span className="text-slate-500 block text-[9px]">Payroll rate</span>
-                      <span className="font-semibold">{salaryType} (Base: ₹{fixedSalary})</span>
+                      <span className="text-slate-500 block text-[9px]">Payroll Rate</span>
+                      <span className="font-semibold">{salaryType} · Base ₹{fixedSalary} · Session ₹{perClassRate}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className={`p-4 border rounded-xl relative ${isDark ? 'border-white/5 bg-white/[0.01]' : 'border-slate-200 bg-slate-50/50'}`}>
-                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Location & Banking Details</h4>
-                <div className="grid grid-cols-2 gap-y-2 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Area / City</span>
-                    <span className="font-semibold">{areaName}, {cityName}</span>
-                  </div>
-                  {isAdminMode && (
-                    <>
-                      <div>
-                        <span className="text-slate-500 block text-[9px]">Bank / Account Number</span>
-                        <span className="font-semibold">{bankName || '—'} / {bankAccountNumber || '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[9px]">UPI ID / PAN Number</span>
-                        <span className="font-semibold">{upiId || '—'} / {panNumber || '—'}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
+              {/* Info banner */}
+              <div className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
+                isDark ? 'border-indigo-500/10 bg-indigo-950/20 text-indigo-300' : 'border-indigo-100 bg-indigo-50 text-indigo-800'
+              }`}>
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  {isAdminMode
+                    ? 'Once submitted, the coach profile will be created and the coach can log in with the provided credentials.'
+                    : 'Once submitted, your profile will be reviewed by the academy admin. You will be notified once your account is activated.'
+                  }
+                </span>
               </div>
             </div>
           )}
