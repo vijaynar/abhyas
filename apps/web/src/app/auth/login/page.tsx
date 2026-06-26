@@ -127,15 +127,17 @@ export default function LoginPage() {
         
         {/* Branding header */}
         <div className="flex flex-col items-center mb-8 text-center">
-          <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-indigo-400 text-xs font-semibold tracking-wider uppercase mb-3 glow-indigo">
-            <Sparkles className="w-3.5 h-3.5" />
-            AI-Powered Attendance
-          </div>
+          {/* Logo */}
+          <img
+            src="/logo.png"
+            alt="Abhyas Logo"
+            className="h-20 w-auto object-contain mb-3 drop-shadow-lg"
+          />
           <h1 className="text-3xl font-black text-white tracking-tight glow-text-indigo">
             ABHYAS
           </h1>
           <p className="text-slate-400 text-xs mt-1.5 font-medium uppercase tracking-widest">
-            Academy Management System
+            Smart Academy Management
           </p>
         </div>
 
