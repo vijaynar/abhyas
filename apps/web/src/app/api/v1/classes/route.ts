@@ -3,7 +3,7 @@
 // POST /api/v1/classes        — create a new class (admin only)
 
 import { getAuthContext, adminDb, ok, created, err, hasRole } from '@/lib/api';
-import { CreateClassSchema } from '@upasthiti/common';
+import { CreateClassSchema } from '@abhyas/common';
 
 export async function GET() {
   try {

@@ -1,5 +1,5 @@
 {
-  "name": "@upasthiti/common",
+  "name": "@abhyas/common",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",

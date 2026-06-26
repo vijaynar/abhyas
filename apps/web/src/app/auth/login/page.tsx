@@ -132,7 +132,7 @@ export default function LoginPage() {
             AI-Powered Attendance
           </div>
           <h1 className="text-3xl font-black text-white tracking-tight glow-text-indigo">
-            UPASTHITI
+            ABHYAS
           </h1>
           <p className="text-slate-400 text-xs mt-1.5 font-medium uppercase tracking-widest">
             Academy Management System

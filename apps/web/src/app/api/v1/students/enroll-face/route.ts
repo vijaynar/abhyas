@@ -5,8 +5,8 @@
 // Access: admin only
 
 import { getAuthContext, adminDb, created, err, hasRole } from '@/lib/api';
-import { FaceEnrollSchema } from '@upasthiti/common';
-import { FACE_MATCH_EMBEDDING_DIMENSIONS } from '@upasthiti/common';
+import { FaceEnrollSchema } from '@abhyas/common';
+import { FACE_MATCH_EMBEDDING_DIMENSIONS } from '@abhyas/common';
 
 export async function POST(req: Request) {
   try {

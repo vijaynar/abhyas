@@ -3,7 +3,7 @@
 // POST /api/v1/batches         — create a new batch (admin only)
 
 import { getAuthContext, adminDb, ok, created, err, hasRole } from '@/lib/api';
-import { CreateBatchSchema } from '@upasthiti/common';
+import { CreateBatchSchema } from '@abhyas/common';
 
 export async function GET(req: Request) {
   try {

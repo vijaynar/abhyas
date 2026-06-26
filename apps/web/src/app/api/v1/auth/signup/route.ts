@@ -7,7 +7,7 @@
 // Access: admin, superadmin only
 
 import { NextResponse } from 'next/server';
-import { SignupSchema } from '@upasthiti/common';
+import { SignupSchema } from '@abhyas/common';
 import { ok, err, created, getAuthContext, adminDb, hasRole } from '@/lib/api';
 
 export async function POST(req: Request) {

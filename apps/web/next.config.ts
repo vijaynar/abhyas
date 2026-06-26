@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Allow importing TypeScript source files from workspace packages
   // without a separate build step during development
-  transpilePackages: ['@upasthiti/database', '@upasthiti/common'],
+  transpilePackages: ['@abhyas/database', '@abhyas/common'],
   experimental: {
     // Enables proper resolution of workspace packages
     externalDir: true,

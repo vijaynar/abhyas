@@ -1,5 +1,5 @@
 {
-  "name": "@upasthiti/web",
+  "name": "@abhyas/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,8 +12,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.106.1",
-    "@upasthiti/common": "*",
-    "@upasthiti/database": "*",
+    "@abhyas/common": "*",
+    "@abhyas/database": "*",
     "clsx": "^2.1.1",
     "face-api.js": "^0.22.2",
     "leaflet": "^1.9.4",

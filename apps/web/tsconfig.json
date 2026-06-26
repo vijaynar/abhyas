@@ -20,10 +20,10 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@upasthiti/database": ["../../packages/database/src/index.ts"],
-      "@upasthiti/database/*": ["../../packages/database/src/*"],
-      "@upasthiti/common": ["../../packages/common/src/index.ts"],
-      "@upasthiti/common/*": ["../../packages/common/src/*"]
+      "@abhyas/database": ["../../packages/database/src/index.ts"],
+      "@abhyas/database/*": ["../../packages/database/src/*"],
+      "@abhyas/common": ["../../packages/common/src/index.ts"],
+      "@abhyas/common/*": ["../../packages/common/src/*"]
     }
   },
   "include": [

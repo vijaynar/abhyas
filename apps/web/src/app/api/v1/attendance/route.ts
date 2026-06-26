@@ -12,7 +12,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthContext, adminDb, ok, created, err, hasRole } from '@/lib/api';
-import { ManualAttendanceSchema } from '@upasthiti/common';
+import { ManualAttendanceSchema } from '@abhyas/common';
 import { toDateString } from '@/lib/utils';
 
 export async function GET(req: Request) {

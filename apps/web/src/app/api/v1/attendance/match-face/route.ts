@@ -12,11 +12,11 @@
 // Access: any authenticated user (admin, student self-scan, parent)
 
 import { getAuthContext, adminDb, ok, err } from '@/lib/api';
-import { FaceMatchSchema } from '@upasthiti/common';
+import { FaceMatchSchema } from '@abhyas/common';
 import {
   FACE_MATCH_THRESHOLD_CONFIDENT,
   FACE_MATCH_THRESHOLD_REVIEW,
-} from '@upasthiti/common';
+} from '@abhyas/common';
 import { toDateString } from '@/lib/utils';
 
 export async function POST(req: Request) {

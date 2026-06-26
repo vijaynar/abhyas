@@ -371,7 +371,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ── Mobile Header Drawer Toggle ── */}
       <header className="md:hidden w-full h-16 flex items-center justify-between px-4 border-b border-white/10 glass-panel fixed top-0 left-0 z-40">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-black tracking-widest text-indigo-400">UPASTHITI</span>
+          <span className="text-sm font-black tracking-widest text-indigo-400">ABHYAS</span>
         </div>
         <button
           onClick={() => setSidebarOpen(true)}
@@ -392,7 +392,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 glow-indigo animate-pulse" />
             <span className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
-              UPASTHITI
+              ABHYAS
             </span>
           </div>
           <button
@@ -410,10 +410,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="overflow-hidden">
             <h4 className="text-xs font-bold text-slate-300 truncate tracking-wide">
-              {profile.role === 'superadmin' ? 'Upasthiti Platform' : profile.tenants.name}
+              {profile.role === 'superadmin' ? 'Abhyas Platform' : profile.tenants.name}
             </h4>
             <p className="text-[10px] text-slate-500 truncate">
-              {profile.role === 'superadmin' ? 'platform.upasthiti.app' : `${profile.tenants.slug}.upasthiti.app`}
+              {profile.role === 'superadmin' ? 'platform.abhyas.app' : `${profile.tenants.slug}.abhyas.app`}
             </p>
           </div>
         </div>

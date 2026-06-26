@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!coach) {
     return {
-      title: 'Coach Not Found | Upasthiti',
+      title: 'Coach Not Found | Abhyas',
     };
   }
 
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const location = [coach.area, coach.city].filter(Boolean).join(', ') || 'India';
 
   return {
-    title: `Best ${skill} in ${location} - Coach ${name} | Upasthiti`,
+    title: `Best ${skill} in ${location} - Coach ${name} | Abhyas`,
     description: `Book a trial session with Coach ${name}. ${coach.experience_years}+ years experience teaching ${skill} physically in ${location} and online. View slot times and student feedback.`,
     openGraph: {
       title: `Coach ${name} - Professional ${skill} Instructor`,

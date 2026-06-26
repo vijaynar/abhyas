@@ -9,7 +9,7 @@
 //   ?page=1&limit=50   pagination
 
 import { getAuthContext, adminDb, ok, created, err, hasRole } from '@/lib/api';
-import { CreateStudentSchema } from '@upasthiti/common';
+import { CreateStudentSchema } from '@abhyas/common';
 
 export async function GET(req: Request) {
   try {

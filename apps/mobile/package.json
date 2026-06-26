@@ -4,8 +4,8 @@
   "main": "index.ts",
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
-    "@upasthiti/common": "^0.1.0",
-    "@upasthiti/database": "^0.1.0",
+    "@abhyas/common": "^0.1.0",
+    "@abhyas/database": "^0.1.0",
     "expo": "~56.0.3",
     "expo-av": "^15.1.7",
     "expo-camera": "^16.1.11",

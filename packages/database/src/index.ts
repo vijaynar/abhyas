@@ -1,5 +1,5 @@
 // packages/database/src/index.ts
-// Main entry point for the @upasthiti/database package
+// Main entry point for the @abhyas/database package
 // Re-exports everything needed by apps/web and apps/mobile
 
 export { createSupabaseBrowserClient } from './client';

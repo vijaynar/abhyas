@@ -1,7 +1,7 @@
 // apps/web/src/lib/utils.ts
 // Shared utility functions for the web app
 
-import type { AttendanceStatus, FineStatus } from '@upasthiti/common';
+import type { AttendanceStatus, FineStatus } from '@abhyas/common';
 
 // ── Date helpers ──────────────────────────────────────────────
 

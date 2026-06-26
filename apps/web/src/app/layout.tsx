@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Upasthiti — Smart Attendance Platform",
+  title: "Abhyas — Smart Academy Management Platform",
   description: "Premium attendance and coaching management for modern academies.",
 };
 

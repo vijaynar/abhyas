@@ -208,7 +208,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
       {/* Footer copyright */}
       <footer className="py-6 border-t border-white/5 text-center text-[10px] text-slate-600 font-semibold tracking-wide mt-12 relative z-10">
-        POWERED BY UPASTHITI ATTEENDANCE • ALL RIGHTS RESERVED
+        POWERED BY ABHYAS ATTENDANCE • ALL RIGHTS RESERVED
       </footer>
     </div>
   );

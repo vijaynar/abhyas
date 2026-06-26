@@ -3,7 +3,7 @@
 // PATCH /api/v1/settings       — update tenant configuration (admin only)
 
 import { getAuthContext, adminDb, ok, err, hasPermission } from '@/lib/api';
-import { UpdateTenantSettingsSchema } from '@upasthiti/common';
+import { UpdateTenantSettingsSchema } from '@abhyas/common';
 
 export async function GET() {
   try {
