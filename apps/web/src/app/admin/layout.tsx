@@ -371,7 +371,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ── Mobile Header Drawer Toggle ── */}
       <header className="md:hidden w-full h-16 flex items-center justify-between px-4 border-b border-white/10 glass-panel fixed top-0 left-0 z-40">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Abhyas" className="h-7 w-auto object-contain" />
+          <img src="/logo.svg" alt="Abhyas" className="h-7 w-auto object-contain" />
           <span className="text-sm font-black tracking-widest text-indigo-400">ABHYAS</span>
         </div>
         <button
@@ -391,7 +391,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 relative">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Abhyas" className="h-8 w-auto object-contain flex-shrink-0" />
+            <img src="/logo.svg" alt="Abhyas" className="h-8 w-auto object-contain flex-shrink-0" />
             <div className="flex flex-col leading-tight">
               <span className="font-extrabold text-base tracking-wider bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
                 ABHYAS

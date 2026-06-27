@@ -129,7 +129,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center mb-8 text-center">
           {/* Logo */}
           <img
-            src="/logo.png"
+            src="/logo.svg"
             alt="Abhyas Logo"
             className="h-20 w-auto object-contain mb-3 drop-shadow-lg"
           />
