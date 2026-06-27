@@ -15,55 +15,65 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // Create a Supabase client that can read/write cookies
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
+  try {
+    // Check if env variables are available before constructing client
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.warn('[Proxy Middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      return response;
     }
-  );
 
-  // Refresh session — important: always call getUser() to refresh
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    // Create a Supabase client that can read/write cookies
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
 
-  const { pathname } = request.nextUrl;
+    // Refresh session — important: always call getUser() to refresh
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  // ── Auth route guards ─────────────────────────────────────
-  const isAuthRoute = pathname.startsWith('/auth');
-  const isAdminRoute = pathname.startsWith('/admin');
-  const isApiRoute = pathname.startsWith('/api');
+    const { pathname } = request.nextUrl;
 
-  // API routes handle their own auth — skip proxy for them
-  if (isApiRoute) {
-    return response;
-  }
+    // ── Auth route guards ─────────────────────────────────────
+    const isAuthRoute = pathname.startsWith('/auth');
+    const isAdminRoute = pathname.startsWith('/admin');
+    const isApiRoute = pathname.startsWith('/api');
 
-  // Redirect authenticated users away from login/register pages
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-  }
+    // API routes handle their own auth — skip proxy for them
+    if (isApiRoute) {
+      return response;
+    }
 
-  // Redirect unauthenticated users to login for protected routes
-  if (isAdminRoute && !user) {
-    const redirectUrl = new URL('/auth/login', request.url);
-    redirectUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(redirectUrl);
+    // Redirect authenticated users away from login/register pages
+    if (isAuthRoute && user) {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
+
+    // Redirect unauthenticated users to login for protected routes
+    if (isAdminRoute && !user) {
+      const redirectUrl = new URL('/auth/login', request.url);
+      redirectUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  } catch (error) {
+    console.error('[Proxy Middleware] Unexpected error:', error);
   }
 
   return response;
